@@ -1,0 +1,20 @@
+# macOS
+.DS_Store
+
+# Textbooks and other local data (copyrighted, not committed)
+data/
+
+# Secrets
+.env
+.env.*
+!.env.example
+service-account*.json
+
+# Node
+node_modules/
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.iml
