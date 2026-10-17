@@ -1,42 +1,33 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
+import 'auth/auth_gate.dart';
+import 'auth/auth_service.dart';
 import 'firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  runApp(const MathTrainerApp());
+  final options = DefaultFirebaseOptions.currentPlatform;
+  await Firebase.initializeApp(options: options);
+  // iOS needs its OAuth client id; Android takes the web client id from google-services.json.
+  await GoogleSignIn.instance.initialize(clientId: options.iosClientId);
+  final googleConfigured = defaultTargetPlatform != TargetPlatform.iOS || options.iosClientId != null;
+  runApp(MathTrainerApp(auth: FirebaseAuthService(googleConfigured: googleConfigured)));
 }
 
 class MathTrainerApp extends StatelessWidget {
-  const MathTrainerApp({super.key});
+  const MathTrainerApp({super.key, required this.auth});
+
+  final FirebaseAuthService auth;
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Math Trainer',
       theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo)),
-      home: const HomeScreen(),
-    );
-  }
-}
-
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    // main() initialises Firebase before runApp; widget tests run without it.
-    final projectId = Firebase.apps.isEmpty ? null : Firebase.app().options.projectId;
-    return Scaffold(
-      appBar: AppBar(title: const Text('Math Trainer')),
-      body: Center(
-        child: Text(
-          projectId == null ? 'Firebase не подключён' : 'Firebase: $projectId',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-      ),
+      home: AuthGate(auth: auth),
     );
   }
 }
