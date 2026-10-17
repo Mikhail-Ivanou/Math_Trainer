@@ -10,26 +10,28 @@ import 'package:math/llm/llm_config.dart';
 import 'package:math/topics/topic_matcher.dart';
 
 const _catalog = [
-  CatalogSection(
-    id: 'math5-2-c3-p05',
-    bookId: 'math5-2',
-    bookTitle: 'Математика. 5 класс. Часть 2',
-    grade: 5,
+  CatalogRule(
+    id: 'math5-1-c1-p09-r03',
+    title: 'Переместительный и сочетательный законы умножения',
+    bookId: 'math5-1',
+    bookTitle: 'Математика. 5 класс. Часть 1',
     subject: 'math',
-    chapterTitle: 'Обыкновенные дроби',
-    number: 5,
-    title: 'Сложение и вычитание обыкновенных дробей',
-    keywords: ['сложение дробей'],
+    chapterTitle: 'Натуральные числа',
+    sectionId: 'math5-1-c1-p09',
+    sectionNumber: 9,
+    sectionTitle: 'Умножение и деление натуральных чисел',
   ),
-  CatalogSection(
-    id: 'math5-2-c3-p07',
-    bookId: 'math5-2',
-    bookTitle: 'Математика. 5 класс. Часть 2',
-    grade: 5,
+  CatalogRule(
+    id: 'math5-1-c1-p09-r04',
+    title: 'Распределительный закон умножения',
+    bookId: 'math5-1',
+    bookTitle: 'Математика. 5 класс. Часть 1',
     subject: 'math',
-    chapterTitle: 'Обыкновенные дроби',
-    number: 7,
-    title: 'Умножение дробных чисел',
+    chapterTitle: 'Натуральные числа',
+    sectionId: 'math5-1-c1-p09',
+    sectionNumber: 9,
+    sectionTitle: 'Умножение и деление натуральных чисел',
+    keywords: ['раскрыть скобки'],
   ),
 ];
 
@@ -45,10 +47,10 @@ void main() {
               'message': {
                 'content': jsonEncode({
                   'matches': [
-                    {'id': 'math5-2-c3-p05', 'why': 'про сложение дробей'},
+                    {'id': 'math5-1-c1-p09-r04', 'why': 'это и есть распределительный закон'},
                     {'id': 'made-up-id', 'why': '?'},
-                    {'id': 'math5-2-c3-p05', 'why': 'повтор'},
-                    {'id': 'math5-2-c3-p07', 'why': ''},
+                    {'id': 'math5-1-c1-p09-r04', 'why': 'повтор'},
+                    {'id': 'math5-1-c1-p09-r03', 'why': ''},
                   ],
                 }),
               },
@@ -59,12 +61,13 @@ void main() {
       );
     });
     const config = LlmConfig(apiKey: 'k', model: 'claude-haiku-5.5', baseUrl: 'https://api.aiai.by/v1');
-    final matches = await TopicMatcher(AiaiClient(config, httpClient: client)).match('не понимаю, как складывать дроби', _catalog);
+    final matches = await TopicMatcher(AiaiClient(config, httpClient: client)).match('распределительный закон умножения', _catalog);
 
-    expect(prompt, contains('не понимаю, как складывать дроби'));
-    expect(prompt, contains('math5-2-c3-p05 | Математика. 5 класс. Часть 2'));
-    expect(matches.map((m) => m.section.id), ['math5-2-c3-p05', 'math5-2-c3-p07']);
-    expect(matches.first.why, 'про сложение дробей');
+    expect(prompt, contains('распределительный закон умножения'));
+    expect(prompt, contains('# Математика. 5 класс. Часть 1, § 9. Умножение и деление натуральных чисел'));
+    expect(prompt, contains('math5-1-c1-p09-r04 | Распределительный закон умножения | раскрыть скобки'));
+    expect(matches.map((m) => m.rule.id), ['math5-1-c1-p09-r04', 'math5-1-c1-p09-r03']);
+    expect(matches.first.why, 'это и есть распределительный закон');
   });
 
   test('empty catalog: no call, no matches', () async {

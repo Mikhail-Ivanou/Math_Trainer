@@ -70,9 +70,8 @@ class HomeScreen extends StatelessWidget {
               ));
             }
             rows.add(ListTile(
-              leading: CircleAvatar(child: Text('${t.number}')),
               title: Text(t.title),
-              subtitle: Text('${t.subjectName} · ${t.chapterTitle}'),
+              subtitle: Text('${t.subjectName} · ${t.source}'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _open(context, t),
             ));

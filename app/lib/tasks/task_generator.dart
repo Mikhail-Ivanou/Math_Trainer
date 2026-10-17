@@ -10,14 +10,18 @@ class GenerationRequest {
     required this.topicTitle,
     required this.rule,
     required this.grade,
+    this.context = '',
     this.subject = 'math',
     Map<TaskType, int>? counts,
   }) : _counts = counts; // ignore: prefer_initializing_formals — the public name is `counts`
 
   final String topicTitle;
 
-  /// The topic's rules and examples, the only source for the tasks.
+  /// The rule and its example: what every task must train.
   final String rule;
+
+  /// The whole paragraph's rule sheet: what else the student knows at this point.
+  final String context;
   final int grade;
 
   /// "math", "algebra" or "geometry".
@@ -84,7 +88,7 @@ class TaskGenerator {
   }
 
   static String systemPrompt(GenerationRequest r) => '''
-Ты — методист и учитель ${_subjectName(r.subject)} ${r.grade} класса (Беларусь). Ты составляешь тренировочные задания для ученика строго по теме и её правилу, которые тебе дают.
+Ты — методист и учитель ${_subjectName(r.subject)} ${r.grade} класса (Беларусь). Ты составляешь тренировочные задания для ученика на одно конкретное правило, которое тебе дают.
 Правила:
 - используй только то, что ученик ${r.grade} класса уже знает к этой теме: правило темы и материал прошлых классов;
 - формулировки на русском языке, понятные ученику ${r.grade} класса;
@@ -101,12 +105,17 @@ class TaskGenerator {
         if (n > 0) '- $n заданий type "${type.name}" — ${_typeHint[type]}',
     ];
     return '''
-Тема «${r.topicTitle}». Правило темы:
+Правило «${r.topicTitle}»:
 <<<
 ${r.rule}
 >>>
-
-Составь $total новых заданий по этой теме:
+${r.context.isEmpty ? '' : '''
+Параграф учебника, из которого это правило (только чтобы понимать, что ученик уже знает):
+<<<
+${r.context}
+>>>
+'''}
+Составь $total новых заданий, каждое из которых тренирует именно это правило:
 ${lines.join('\n')}
 
 Поля для проверки ответа (их видит только программа):

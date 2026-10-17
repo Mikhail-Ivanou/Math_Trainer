@@ -16,16 +16,15 @@ class Repository {
 
   static String progressId(String topicId, String taskId) => '${topicId}__$taskId';
 
-  /// All textbook sections of a grade (one small document).
-  Future<List<CatalogSection>> catalog(int grade) async {
+  /// All textbook rules of a grade (one document).
+  Future<List<CatalogRule>> catalog(int grade) async {
     final d = await _db.doc('catalog/grade-$grade').get();
     return [
-      for (final s in (d.data()?['sections'] as List? ?? const []))
-        CatalogSection.fromJson(Map<String, dynamic>.from(s as Map)),
+      for (final r in (d.data()?['rules'] as List? ?? const [])) CatalogRule.fromJson(Map<String, dynamic>.from(r as Map)),
     ];
   }
 
-  /// Topics students added, by grade, then subject, chapter and paragraph.
+  /// Topics students added, by grade, then subject, book, chapter, paragraph and rule.
   Stream<List<Topic>> topics() => _db.collection('topics').snapshots().map((s) {
         final list = [
           for (final d in s.docs)
@@ -40,21 +39,44 @@ class Repository {
       a.subject.compareTo(b.subject),
       a.bookId.compareTo(b.bookId),
       a.chapter.compareTo(b.chapter),
-      a.number.compareTo(b.number),
+      a.sectionNumber.compareTo(b.sectionNumber),
+      a.id.compareTo(b.id), // rule ids end with their order in the paragraph
     ]) {
       if (c != 0) return c;
     }
     return 0;
   }
 
-  Future<Set<String>> existingTopicIds() async =>
-      {for (final d in (await _db.collection('topics').get()).docs) d.id};
+  /// Topics already added, by id.
+  Future<Map<String, Topic>> existingTopics() async => {
+        for (final d in (await _db.collection('topics').get()).docs) d.id: Topic.fromFirestore(d.id, d.data()),
+      };
 
-  /// Adds a textbook section as a topic (or joins it if someone already added
+  /// An existing topic of the same grade with the same rule name from another
+  /// paragraph («Распределительный закон умножения» is in three grade 5 ones).
+  static Topic? similarTopic(CatalogRule r, int grade, Map<String, Topic> existing) {
+    String norm(String s) => s.toLowerCase().replaceAll('ё', 'е').replaceAll(RegExp(r'[^\p{L}\p{N}]+', unicode: true), ' ').trim();
+    final title = norm(r.title);
+    for (final t in existing.values) {
+      if (t.id != r.id && t.grade == grade && norm(t.title) == title) return t;
+    }
+    return null;
+  }
+
+  /// The paragraph's whole rule sheet, as background for a topic.
+  Future<String> sectionSheet(Topic t) async =>
+      (await _db.doc('books/${t.bookId}/sections/${t.sectionId}').get()).data()?['rule'] as String? ?? '';
+
+  static const _topicFields = [
+    'bookId', 'bookTitle', 'sectionId', 'grade', 'subject', 'chapter', 'chapterTitle', //
+    'sectionNumber', 'sectionTitle', 'title', 'rule',
+  ];
+
+  /// Adds a textbook rule as a topic (or joins it if someone already added
   /// it) and records why this student needs it.
-  Future<Topic> addTopic(CatalogSection section, {required String uid, required String reason}) async {
-    final sectionRef = _db.doc('books/${section.bookId}/sections/${section.id}');
-    final topicRef = _db.doc('topics/${section.id}');
+  Future<Topic> addTopic(CatalogRule r, {required String uid, required String reason}) async {
+    final ruleRef = _db.doc('books/${r.bookId}/sections/${r.sectionId}/rules/${r.id}');
+    final topicRef = _db.doc('topics/${r.id}');
     final requestRef = topicRef.collection('requests').doc(uid);
     return _db.runTransaction((tx) async {
       final existing = await tx.get(topicRef);
@@ -62,14 +84,12 @@ class Repository {
       if (existing.exists) {
         fields = existing.data()!;
       } else {
-        final s = (await tx.get(sectionRef)).data() ?? (throw StateError('раздел ${section.id} не найден'));
-        fields = {
-          for (final k in const ['bookId', 'grade', 'subject', 'chapter', 'chapterTitle', 'number', 'title', 'rule']) k: s[k],
-        };
-        tx.set(topicRef, {...fields, 'sectionId': section.id, 'createdBy': uid, 'createdAt': FieldValue.serverTimestamp()});
+        final rule = (await tx.get(ruleRef)).data() ?? (throw StateError('правило ${r.id} не найдено'));
+        fields = {for (final k in _topicFields) k: rule[k]};
+        tx.set(topicRef, {...fields, 'createdBy': uid, 'createdAt': FieldValue.serverTimestamp()});
       }
       tx.set(requestRef, {'text': reason.trim(), 'createdAt': FieldValue.serverTimestamp()});
-      return Topic.fromFirestore(section.id, fields);
+      return Topic.fromFirestore(r.id, fields);
     });
   }
 

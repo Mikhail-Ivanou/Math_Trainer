@@ -26,6 +26,8 @@ class _TopicScreenState extends State<TopicScreen> {
   late final Stream<List<StoredTask>> _tasks = widget.repo.tasks(widget.topic.id);
   late final Stream<Set<String>> _solved = widget.repo.solvedTaskIds(widget.user.uid, widget.topic.id);
   bool _generating = false;
+  // The paragraph's whole rule sheet: background for generation and «Весь параграф».
+  late final Future<String> _sectionSheet = widget.repo.sectionSheet(widget.topic).catchError((_) => '');
 
   Future<void> _generate() async {
     final generator = widget.generator!;
@@ -33,7 +35,13 @@ class _TopicScreenState extends State<TopicScreen> {
     setState(() => _generating = true);
     try {
       final t = widget.topic;
-      final result = await generator.generate(GenerationRequest(topicTitle: t.title, rule: t.rule, grade: t.grade, subject: t.subject));
+      final result = await generator.generate(GenerationRequest(
+        topicTitle: t.title,
+        rule: t.rule,
+        context: await _sectionSheet,
+        grade: t.grade,
+        subject: t.subject,
+      ));
       if (result.tasks.isEmpty) {
         messenger.showSnackBar(const SnackBar(content: Text('Модель не дала ни одного верного задания, попробуйте ещё раз')));
         return;
@@ -57,11 +65,7 @@ class _TopicScreenState extends State<TopicScreen> {
         builder: (context) => DraggableScrollableSheet(
           expand: false,
           initialChildSize: 0.7,
-          builder: (context, scroll) => SingleChildScrollView(
-            controller: scroll,
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-            child: SelectableText(widget.topic.rule),
-          ),
+          builder: (context, scroll) => _RuleSheet(topic: widget.topic, sectionSheet: _sectionSheet, scroll: scroll),
         ),
       );
 
@@ -70,7 +74,7 @@ class _TopicScreenState extends State<TopicScreen> {
     final t = widget.topic;
     return Scaffold(
       appBar: AppBar(
-        title: Text('§ ${t.number}. ${t.title}', maxLines: 2, overflow: TextOverflow.ellipsis),
+        title: Text(t.title, maxLines: 2, overflow: TextOverflow.ellipsis),
         actions: [IconButton(tooltip: 'Правило', icon: const Icon(Icons.menu_book_outlined), onPressed: _showTheory)],
       ),
       floatingActionButton: widget.generator == null
@@ -123,6 +127,61 @@ class _TopicScreenState extends State<TopicScreen> {
           },
         ),
       ),
+    );
+  }
+}
+
+/// The rule, its source, and on request the whole paragraph's rule sheet.
+class _RuleSheet extends StatefulWidget {
+  const _RuleSheet({required this.topic, required this.sectionSheet, required this.scroll});
+
+  final Topic topic;
+  final Future<String> sectionSheet;
+  final ScrollController scroll;
+
+  @override
+  State<_RuleSheet> createState() => _RuleSheetState();
+}
+
+class _RuleSheetState extends State<_RuleSheet> {
+  bool _showSection = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final t = widget.topic;
+    return ListView(
+      controller: widget.scroll,
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+      children: [
+        Text(t.title, style: theme.textTheme.titleLarge),
+        const SizedBox(height: 4),
+        Text('${t.bookTitle} · ${t.source}', style: theme.textTheme.bodySmall),
+        const SizedBox(height: 16),
+        SelectableText(t.rule, style: theme.textTheme.bodyLarge),
+        const SizedBox(height: 16),
+        if (!_showSection)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => setState(() => _showSection = true),
+              icon: const Icon(Icons.expand_more),
+              label: const Text('Весь параграф'),
+            ),
+          )
+        else
+          FutureBuilder<String>(
+            future: widget.sectionSheet,
+            builder: (context, snap) => snap.hasData
+                ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Divider(),
+                    Text(t.source, style: theme.textTheme.titleSmall),
+                    const SizedBox(height: 8),
+                    SelectableText(snap.data!.isEmpty ? 'Не удалось загрузить параграф' : snap.data!),
+                  ])
+                : const Center(child: CircularProgressIndicator()),
+          ),
+      ],
     );
   }
 }

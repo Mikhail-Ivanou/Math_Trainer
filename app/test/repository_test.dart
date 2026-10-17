@@ -23,4 +23,19 @@ void main() {
     ]);
     expect(sorted.map((s) => s.id), ['new-easy-expr', 'new-easy-word', 'new-medium', 'new-hard', 'old-easy']);
   });
+
+  test('similar topic: same rule name in another paragraph of the same grade', () {
+    Topic topic(String id, String title, int grade) => Topic(
+          id: id, title: title, rule: '', grade: grade, subject: 'math', bookId: 'b', bookTitle: '', chapter: 1,
+          chapterTitle: '', sectionId: 's', sectionNumber: 9, sectionTitle: 'Умножение');
+    const rule = CatalogRule(
+      id: 'math5-1-c2-p16-r03', title: 'Распределительный закон умножения', bookId: 'math5-1', bookTitle: '',
+      subject: 'math', chapterTitle: '', sectionId: 'math5-1-c2-p16', sectionNumber: 16, sectionTitle: 'Выражения');
+    final existing = {
+      'math5-1-c1-p09-r04': topic('math5-1-c1-p09-r04', 'Распределительный  закон умножения.', 5),
+      'math6-x': topic('math6-x', 'Распределительный закон умножения', 6),
+    };
+    expect(Repository.similarTopic(rule, 5, existing)?.id, 'math5-1-c1-p09-r04');
+    expect(Repository.similarTopic(rule, 7, existing), isNull);
+  });
 }

@@ -1,83 +1,101 @@
 import '../tasks/task.dart';
 
-/// One § of a textbook as listed in `catalog/grade-{n}`: enough to match a request.
-class CatalogSection {
-  const CatalogSection({
+const subjectNames = {'math': 'Математика', 'algebra': 'Алгебра', 'geometry': 'Геометрия'};
+
+/// One rule of a textbook paragraph as listed in `catalog/grade-{n}`: enough to match a request.
+class CatalogRule {
+  const CatalogRule({
     required this.id,
+    required this.title,
     required this.bookId,
     required this.bookTitle,
-    required this.grade,
     required this.subject,
     required this.chapterTitle,
-    required this.number,
-    required this.title,
+    required this.sectionId,
+    required this.sectionNumber,
+    required this.sectionTitle,
     this.keywords = const [],
   });
 
   final String id;
+
+  /// The rule's name: «Распределительный закон умножения».
+  final String title;
   final String bookId;
   final String bookTitle;
-  final int grade;
   final String subject;
   final String chapterTitle;
-  final int number;
-  final String title;
+  final String sectionId;
+  final int sectionNumber;
+  final String sectionTitle;
   final List<String> keywords;
 
-  factory CatalogSection.fromJson(Map<String, dynamic> d, {String bookTitle = ''}) => CatalogSection(
+  factory CatalogRule.fromJson(Map<String, dynamic> d) => CatalogRule(
         id: d['id'] as String,
+        title: d['title'] as String? ?? '',
         bookId: d['bookId'] as String,
-        bookTitle: d['bookTitle'] as String? ?? bookTitle,
-        grade: (d['grade'] as num).toInt(),
+        bookTitle: d['bookTitle'] as String? ?? '',
         subject: d['subject'] as String? ?? 'math',
         chapterTitle: d['chapterTitle'] as String? ?? '',
-        number: (d['number'] as num?)?.toInt() ?? 0,
-        title: d['title'] as String? ?? '',
+        sectionId: d['sectionId'] as String,
+        sectionNumber: (d['sectionNumber'] as num?)?.toInt() ?? 0,
+        sectionTitle: d['sectionTitle'] as String? ?? '',
         keywords: [for (final k in (d['keywords'] as List? ?? const [])) '$k'],
       );
 }
 
-/// A textbook section a student added to work on: `topics/{sectionId}`.
+/// A textbook rule a student added to work on: `topics/{ruleId}`.
 class Topic {
   const Topic({
     required this.id,
-    required this.bookId,
-    required this.grade,
-    required this.subject,
-    required this.chapter,
-    required this.chapterTitle,
-    required this.number,
     required this.title,
     required this.rule,
+    required this.grade,
+    required this.subject,
+    required this.bookId,
+    required this.bookTitle,
+    required this.chapter,
+    required this.chapterTitle,
+    required this.sectionId,
+    required this.sectionNumber,
+    required this.sectionTitle,
     this.createdAt,
   });
 
   final String id;
-  final String bookId;
+
+  /// The rule's name and its statement with an example.
+  final String title;
+  final String rule;
   final int grade;
   final String subject;
+  final String bookId;
+  final String bookTitle;
   final int chapter;
   final String chapterTitle;
-  final int number;
-  final String title;
 
-  /// The rule sheet of the section: definitions, rules and worked examples.
-  final String rule;
+  /// The paragraph the rule comes from.
+  final String sectionId;
+  final int sectionNumber;
+  final String sectionTitle;
   final DateTime? createdAt;
 
-  static const subjectNames = {'math': 'Математика', 'algebra': 'Алгебра', 'geometry': 'Геометрия'};
   String get subjectName => subjectNames[subject] ?? subject;
+  String get source => '§ $sectionNumber. $sectionTitle';
 
   factory Topic.fromFirestore(String id, Map<String, dynamic> d, {DateTime? createdAt}) => Topic(
         id: id,
-        bookId: d['bookId'] as String? ?? '',
-        grade: (d['grade'] as num?)?.toInt() ?? 0,
-        subject: d['subject'] as String? ?? 'math',
-        chapter: (d['chapter'] as num?)?.toInt() ?? 0,
-        chapterTitle: d['chapterTitle'] as String? ?? '',
-        number: (d['number'] as num?)?.toInt() ?? 0,
         title: d['title'] as String? ?? '',
         rule: d['rule'] as String? ?? '',
+        grade: (d['grade'] as num?)?.toInt() ?? 0,
+        subject: d['subject'] as String? ?? 'math',
+        bookId: d['bookId'] as String? ?? '',
+        bookTitle: d['bookTitle'] as String? ?? '',
+        chapter: (d['chapter'] as num?)?.toInt() ?? 0,
+        chapterTitle: d['chapterTitle'] as String? ?? '',
+        sectionId: d['sectionId'] as String? ?? '',
+        sectionNumber: (d['sectionNumber'] as num?)?.toInt() ?? 0,
+        sectionTitle: d['sectionTitle'] as String? ?? '',
         createdAt: createdAt,
       );
 }

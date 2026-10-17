@@ -18,6 +18,24 @@ const SECTION = {
   keywords: ['проценты'],
 };
 
+const RULE = {
+  id: 'math6-c2-p01-r02',
+  order: 2,
+  title: 'Нахождение процентов от числа',
+  rule: 'Чтобы найти p % от числа a, нужно a · p : 100. Пример: 20 % от 50 = 10.',
+  keywords: ['процент от числа'],
+  bookId: 'math6',
+  bookTitle: 'Математика. 6 класс',
+  grade: 6,
+  subject: 'math',
+  chapter: 2,
+  chapterTitle: 'Проценты и пропорции',
+  sectionId: SECTION.id,
+  sectionNumber: 1,
+  sectionTitle: 'Проценты',
+};
+const TOPIC_ID = RULE.id;
+
 before(async () => {
   env = await initializeTestEnvironment({
     projectId: 'demo-math-trainer',
@@ -33,6 +51,7 @@ beforeEach(async () => {
     const db = ctx.firestore();
     await setDoc(doc(db, 'books/math6'), { title: 'Математика. 6 класс', grade: 6 });
     await setDoc(doc(db, `books/math6/sections/${SECTION.id}`), SECTION);
+    await setDoc(doc(db, `books/math6/sections/${SECTION.id}/rules/${RULE.id}`), RULE);
     await setDoc(doc(db, 'catalog/grade-6'), { grade: 6, sections: [SECTION] });
     await setDoc(doc(db, 'topics/math5-1-c1-p08'), { title: 'Сложение и вычитание натуральных чисел' });
     await setDoc(doc(db, 'topics/math5-1-c1-p08/tasks/book-1'), { question: '37 – 0', answer: '37', source: 'backend' });
@@ -44,8 +63,8 @@ const other = () => env.authenticatedContext('other').firestore();
 const anon = () => env.unauthenticatedContext().firestore();
 
 const topicFor = (over = {}) => {
-  const { id, keywords, ...fields } = SECTION;
-  return { ...fields, sectionId: id, createdBy: 'kid', createdAt: serverTimestamp(), ...over };
+  const { id, keywords, order, ...fields } = RULE;
+  return { ...fields, createdBy: 'kid', createdAt: serverTimestamp(), ...over };
 };
 
 const appTask = (over = {}) => ({
@@ -65,6 +84,8 @@ describe('library', () => {
   test('signed-in users read books, sections and the catalog; nobody writes', async () => {
     await assertSucceeds(getDoc(doc(kid(), 'books/math6')));
     await assertSucceeds(getDoc(doc(kid(), `books/math6/sections/${SECTION.id}`)));
+    await assertSucceeds(getDoc(doc(kid(), `books/math6/sections/${SECTION.id}/rules/${RULE.id}`)));
+    await assertFails(setDoc(doc(kid(), `books/math6/sections/${SECTION.id}/rules/x`), RULE));
     await assertSucceeds(getDoc(doc(kid(), 'catalog/grade-6')));
     await assertFails(getDoc(doc(anon(), 'catalog/grade-6')));
     await assertFails(setDoc(doc(kid(), 'catalog/grade-6'), { grade: 6 }));
@@ -73,37 +94,39 @@ describe('library', () => {
 });
 
 describe('topics', () => {
-  test('a student adds a textbook section as a topic, with the reason', async () => {
+  test('a student adds a textbook rule as a topic, with the reason', async () => {
     const db = kid();
     const batch = writeBatch(db);
-    batch.set(doc(db, `topics/${SECTION.id}`), topicFor());
-    batch.set(doc(db, `topics/${SECTION.id}/requests/kid`), { text: 'не понимаю проценты', createdAt: serverTimestamp() });
+    batch.set(doc(db, `topics/${TOPIC_ID}`), topicFor());
+    batch.set(doc(db, `topics/${TOPIC_ID}/requests/kid`), { text: 'не понимаю проценты', createdAt: serverTimestamp() });
     await assertSucceeds(batch.commit());
-    await assertSucceeds(getDoc(doc(other(), `topics/${SECTION.id}`)));
+    await assertSucceeds(getDoc(doc(other(), `topics/${TOPIC_ID}`)));
   });
 
   test('another student joins an existing topic with their own request only', async () => {
-    await assertSucceeds(setDoc(doc(kid(), `topics/${SECTION.id}`), topicFor()));
-    await assertSucceeds(setDoc(doc(other(), `topics/${SECTION.id}/requests/other`), { text: 'проценты', createdAt: serverTimestamp() }));
-    await assertFails(setDoc(doc(other(), `topics/${SECTION.id}/requests/kid`), { text: 'x', createdAt: serverTimestamp() }));
-    await assertFails(getDoc(doc(other(), `topics/${SECTION.id}/requests/kid`)));
-    await assertFails(setDoc(doc(other(), `topics/${SECTION.id}`), topicFor({ createdBy: 'other' }))); // no overwrite
+    await assertSucceeds(setDoc(doc(kid(), `topics/${TOPIC_ID}`), topicFor()));
+    await assertSucceeds(setDoc(doc(other(), `topics/${TOPIC_ID}/requests/other`), { text: 'проценты', createdAt: serverTimestamp() }));
+    await assertFails(setDoc(doc(other(), `topics/${TOPIC_ID}/requests/kid`), { text: 'x', createdAt: serverTimestamp() }));
+    await assertFails(getDoc(doc(other(), `topics/${TOPIC_ID}/requests/kid`)));
+    await assertFails(setDoc(doc(other(), `topics/${TOPIC_ID}`), topicFor({ createdBy: 'other' }))); // no overwrite
   });
 
-  test('topics must match a real section exactly', async () => {
-    await assertFails(setDoc(doc(kid(), 'topics/made-up'), topicFor({ sectionId: 'made-up' })));
-    await assertFails(setDoc(doc(kid(), `topics/${SECTION.id}`), topicFor({ title: 'Моя тема' })));
-    await assertFails(setDoc(doc(kid(), `topics/${SECTION.id}`), topicFor({ rule: 'другое правило' })));
-    await assertFails(setDoc(doc(kid(), `topics/${SECTION.id}`), topicFor({ grade: 7 })));
-    await assertFails(setDoc(doc(kid(), `topics/${SECTION.id}`), topicFor({ createdBy: 'other' })));
-    await assertFails(setDoc(doc(kid(), `topics/${SECTION.id}`), topicFor({ extra: 1 })));
-    await assertFails(setDoc(doc(anon(), `topics/${SECTION.id}`), topicFor()));
+  test('topics must match a real rule exactly', async () => {
+    await assertFails(setDoc(doc(kid(), 'topics/made-up'), topicFor()));
+    await assertFails(setDoc(doc(kid(), `topics/${TOPIC_ID}`), topicFor({ sectionId: 'other-section' })));
+    await assertFails(setDoc(doc(kid(), `topics/${SECTION.id}`), topicFor())); // a whole § is not a topic
+    await assertFails(setDoc(doc(kid(), `topics/${TOPIC_ID}`), topicFor({ title: 'Моя тема' })));
+    await assertFails(setDoc(doc(kid(), `topics/${TOPIC_ID}`), topicFor({ rule: 'другое правило' })));
+    await assertFails(setDoc(doc(kid(), `topics/${TOPIC_ID}`), topicFor({ grade: 7 })));
+    await assertFails(setDoc(doc(kid(), `topics/${TOPIC_ID}`), topicFor({ createdBy: 'other' })));
+    await assertFails(setDoc(doc(kid(), `topics/${TOPIC_ID}`), topicFor({ extra: 1 })));
+    await assertFails(setDoc(doc(anon(), `topics/${TOPIC_ID}`), topicFor()));
   });
 
   test('requests need the topic and a short text', async () => {
     await assertFails(setDoc(doc(kid(), 'topics/nope/requests/kid'), { text: 'x', createdAt: serverTimestamp() }));
-    await assertSucceeds(setDoc(doc(kid(), `topics/${SECTION.id}`), topicFor()));
-    await assertFails(setDoc(doc(kid(), `topics/${SECTION.id}/requests/kid`), { text: 'x'.repeat(501), createdAt: serverTimestamp() }));
+    await assertSucceeds(setDoc(doc(kid(), `topics/${TOPIC_ID}`), topicFor()));
+    await assertFails(setDoc(doc(kid(), `topics/${TOPIC_ID}/requests/kid`), { text: 'x'.repeat(501), createdAt: serverTimestamp() }));
   });
 
   test('topics are never changed or deleted by clients', async () => {

@@ -4,35 +4,39 @@ import '../data/models.dart';
 import '../llm/aiai_client.dart';
 
 class TopicMatch {
-  const TopicMatch(this.section, this.why);
-  final CatalogSection section;
+  const TopicMatch(this.rule, this.why);
+  final CatalogRule rule;
   final String why;
 }
 
-/// Finds the textbook sections a student's request is about. The model only
+/// Finds the textbook rules a student's request is about. The model only
 /// picks from the grade's catalog; ids it invents are dropped.
 class TopicMatcher {
   TopicMatcher(this.client);
 
   final AiaiClient client;
 
-  Future<List<TopicMatch>> match(String request, List<CatalogSection> catalog, {int max = 3}) async {
+  Future<List<TopicMatch>> match(String request, List<CatalogRule> catalog, {int max = 4}) async {
     if (catalog.isEmpty) return const [];
-    final byId = {for (final s in catalog) s.id: s};
-    final list = catalog
-        .map((s) => '${s.id} | ${s.bookTitle} | ${s.chapterTitle} | § ${s.number}. ${s.title} | ${s.keywords.join(', ')}')
-        .join('\n');
+    final byId = {for (final r in catalog) r.id: r};
+    final lines = StringBuffer();
+    String? section;
+    for (final r in catalog) {
+      final s = '${r.bookTitle}, § ${r.sectionNumber}. ${r.sectionTitle}';
+      if (s != section) lines.writeln('# $s');
+      section = s;
+      lines.writeln('${r.id} | ${r.title} | ${r.keywords.join(', ')}');
+    }
     final reply = await client.chat(
       maxTokens: 1500,
-      system: 'Ты помогаешь школьнику найти в учебниках тему, которая ему трудно даётся. '
-          'Выбирай только из списка разделов. Верни только JSON.',
+      system: 'Ты помогаешь школьнику найти в учебниках конкретное правило, которое ему трудно даётся. '
+          'Выбирай только из списка правил. Верни только JSON.',
       user: '''
 Ученик написал: «$request»
 
-Разделы учебников (id | учебник | глава | параграф | ключевые слова):
-$list
-
-Выбери до $max разделов, которые лучше всего подходят под запрос, самый подходящий первым. Если ни один не подходит, верни пустой список.
+Правила из учебников по параграфам (id | правило | ключевые слова):
+$lines
+Выбери до $max правил, которые лучше всего подходят под запрос, самое подходящее первым. Предпочитай конкретное правило, а не общее. Если ничего не подходит, верни пустой список.
 Формат: {"matches": [{"id": "…", "why": "коротко, почему подходит"}]}''',
     );
     final start = reply.content.indexOf('{'), end = reply.content.lastIndexOf('}');
