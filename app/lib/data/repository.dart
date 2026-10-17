@@ -9,16 +9,69 @@ class Repository {
 
   final FirebaseFirestore _db;
 
+  static const grades = [5, 6, 7];
+
   CollectionReference<Map<String, dynamic>> _tasks(String topicId) => _db.collection('topics/$topicId/tasks');
   CollectionReference<Map<String, dynamic>> _progress(String uid) => _db.collection('users/$uid/progress');
 
   static String progressId(String topicId, String taskId) => '${topicId}__$taskId';
 
-  Stream<List<Topic>> topics() => _db
-      .collection('topics')
-      .orderBy('order')
-      .snapshots()
-      .map((s) => s.docs.map((d) => Topic.fromFirestore(d.id, d.data())).toList());
+  /// All textbook sections of a grade (one small document).
+  Future<List<CatalogSection>> catalog(int grade) async {
+    final d = await _db.doc('catalog/grade-$grade').get();
+    return [
+      for (final s in (d.data()?['sections'] as List? ?? const []))
+        CatalogSection.fromJson(Map<String, dynamic>.from(s as Map)),
+    ];
+  }
+
+  /// Topics students added, by grade, then subject, chapter and paragraph.
+  Stream<List<Topic>> topics() => _db.collection('topics').snapshots().map((s) {
+        final list = [
+          for (final d in s.docs)
+            Topic.fromFirestore(d.id, d.data(), createdAt: (d.data()['createdAt'] as Timestamp?)?.toDate()),
+        ];
+        return list..sort(compareTopics);
+      });
+
+  static int compareTopics(Topic a, Topic b) {
+    for (final c in [
+      a.grade.compareTo(b.grade),
+      a.subject.compareTo(b.subject),
+      a.bookId.compareTo(b.bookId),
+      a.chapter.compareTo(b.chapter),
+      a.number.compareTo(b.number),
+    ]) {
+      if (c != 0) return c;
+    }
+    return 0;
+  }
+
+  Future<Set<String>> existingTopicIds() async =>
+      {for (final d in (await _db.collection('topics').get()).docs) d.id};
+
+  /// Adds a textbook section as a topic (or joins it if someone already added
+  /// it) and records why this student needs it.
+  Future<Topic> addTopic(CatalogSection section, {required String uid, required String reason}) async {
+    final sectionRef = _db.doc('books/${section.bookId}/sections/${section.id}');
+    final topicRef = _db.doc('topics/${section.id}');
+    final requestRef = topicRef.collection('requests').doc(uid);
+    return _db.runTransaction((tx) async {
+      final existing = await tx.get(topicRef);
+      final Map<String, dynamic> fields;
+      if (existing.exists) {
+        fields = existing.data()!;
+      } else {
+        final s = (await tx.get(sectionRef)).data() ?? (throw StateError('раздел ${section.id} не найден'));
+        fields = {
+          for (final k in const ['bookId', 'grade', 'subject', 'chapter', 'chapterTitle', 'number', 'title', 'rule']) k: s[k],
+        };
+        tx.set(topicRef, {...fields, 'sectionId': section.id, 'createdBy': uid, 'createdAt': FieldValue.serverTimestamp()});
+      }
+      tx.set(requestRef, {'text': reason.trim(), 'createdAt': FieldValue.serverTimestamp()});
+      return Topic.fromFirestore(section.id, fields);
+    });
+  }
 
   /// Newest batch first, easy to hard inside a batch (a batch shares one server
   /// timestamp). Documents that don't parse are skipped rather than breaking the list.
@@ -81,4 +134,9 @@ class Repository {
     }
     await batch.commit();
   }
+
+  /// The grade this student picked last time (users/{uid}.grade).
+  Future<int?> lastGrade(String uid) async => ((await _db.doc('users/$uid').get()).data()?['grade'] as num?)?.toInt();
+
+  Future<void> saveGrade(String uid, int grade) => _db.doc('users/$uid').set({'grade': grade}, SetOptions(merge: true));
 }

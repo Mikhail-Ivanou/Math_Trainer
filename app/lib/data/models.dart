@@ -1,35 +1,84 @@
 import '../tasks/task.dart';
 
-/// One textbook paragraph: `topics/{id}`.
-class Topic {
-  const Topic({
+/// One § of a textbook as listed in `catalog/grade-{n}`: enough to match a request.
+class CatalogSection {
+  const CatalogSection({
     required this.id,
-    required this.title,
-    required this.chapter,
+    required this.bookId,
+    required this.bookTitle,
+    required this.grade,
+    required this.subject,
     required this.chapterTitle,
-    required this.paragraph,
-    required this.theory,
-    this.bookPage,
+    required this.number,
+    required this.title,
+    this.keywords = const [],
   });
 
   final String id;
+  final String bookId;
+  final String bookTitle;
+  final int grade;
+  final String subject;
+  final String chapterTitle;
+  final int number;
   final String title;
+  final List<String> keywords;
+
+  factory CatalogSection.fromJson(Map<String, dynamic> d, {String bookTitle = ''}) => CatalogSection(
+        id: d['id'] as String,
+        bookId: d['bookId'] as String,
+        bookTitle: d['bookTitle'] as String? ?? bookTitle,
+        grade: (d['grade'] as num).toInt(),
+        subject: d['subject'] as String? ?? 'math',
+        chapterTitle: d['chapterTitle'] as String? ?? '',
+        number: (d['number'] as num?)?.toInt() ?? 0,
+        title: d['title'] as String? ?? '',
+        keywords: [for (final k in (d['keywords'] as List? ?? const [])) '$k'],
+      );
+}
+
+/// A textbook section a student added to work on: `topics/{sectionId}`.
+class Topic {
+  const Topic({
+    required this.id,
+    required this.bookId,
+    required this.grade,
+    required this.subject,
+    required this.chapter,
+    required this.chapterTitle,
+    required this.number,
+    required this.title,
+    required this.rule,
+    this.createdAt,
+  });
+
+  final String id;
+  final String bookId;
+  final int grade;
+  final String subject;
   final int chapter;
   final String chapterTitle;
-  final int paragraph;
+  final int number;
+  final String title;
 
-  /// The paragraph's rules and examples, the context for generating tasks.
-  final String theory;
-  final int? bookPage;
+  /// The rule sheet of the section: definitions, rules and worked examples.
+  final String rule;
+  final DateTime? createdAt;
 
-  factory Topic.fromFirestore(String id, Map<String, dynamic> d) => Topic(
+  static const subjectNames = {'math': 'Математика', 'algebra': 'Алгебра', 'geometry': 'Геометрия'};
+  String get subjectName => subjectNames[subject] ?? subject;
+
+  factory Topic.fromFirestore(String id, Map<String, dynamic> d, {DateTime? createdAt}) => Topic(
         id: id,
-        title: d['title'] as String? ?? '',
+        bookId: d['bookId'] as String? ?? '',
+        grade: (d['grade'] as num?)?.toInt() ?? 0,
+        subject: d['subject'] as String? ?? 'math',
         chapter: (d['chapter'] as num?)?.toInt() ?? 0,
         chapterTitle: d['chapterTitle'] as String? ?? '',
-        paragraph: (d['paragraph'] as num?)?.toInt() ?? 0,
-        theory: d['theory'] as String? ?? '',
-        bookPage: (d['bookPage'] as num?)?.toInt(),
+        number: (d['number'] as num?)?.toInt() ?? 0,
+        title: d['title'] as String? ?? '',
+        rule: d['rule'] as String? ?? '',
+        createdAt: createdAt,
       );
 }
 
@@ -40,7 +89,7 @@ class StoredTask {
   final String id;
   final MathTask task;
 
-  /// "app" (generated on a phone), "backend" (web / backend) or "book".
+  /// "app" (generated on a phone) or "backend" (web / backend).
   final String source;
   final String? createdBy;
   final DateTime? createdAt;

@@ -32,7 +32,8 @@ class _TopicScreenState extends State<TopicScreen> {
     final messenger = ScaffoldMessenger.of(context);
     setState(() => _generating = true);
     try {
-      final result = await generator.generate(GenerationRequest(topicTitle: widget.topic.title, excerpt: widget.topic.theory));
+      final t = widget.topic;
+      final result = await generator.generate(GenerationRequest(topicTitle: t.title, rule: t.rule, grade: t.grade, subject: t.subject));
       if (result.tasks.isEmpty) {
         messenger.showSnackBar(const SnackBar(content: Text('Модель не дала ни одного верного задания, попробуйте ещё раз')));
         return;
@@ -59,7 +60,7 @@ class _TopicScreenState extends State<TopicScreen> {
           builder: (context, scroll) => SingleChildScrollView(
             controller: scroll,
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-            child: SelectableText(widget.topic.theory),
+            child: SelectableText(widget.topic.rule),
           ),
         ),
       );
@@ -69,8 +70,8 @@ class _TopicScreenState extends State<TopicScreen> {
     final t = widget.topic;
     return Scaffold(
       appBar: AppBar(
-        title: Text('§ ${t.paragraph}. ${t.title}', maxLines: 2, overflow: TextOverflow.ellipsis),
-        actions: [IconButton(tooltip: 'Теория', icon: const Icon(Icons.menu_book_outlined), onPressed: _showTheory)],
+        title: Text('§ ${t.number}. ${t.title}', maxLines: 2, overflow: TextOverflow.ellipsis),
+        actions: [IconButton(tooltip: 'Правило', icon: const Icon(Icons.menu_book_outlined), onPressed: _showTheory)],
       ),
       floatingActionButton: widget.generator == null
           ? null
@@ -141,13 +142,18 @@ class _TaskCardState extends State<TaskCard> {
   bool _showAnswer = false;
 
   static const _difficulty = {Difficulty.easy: 'легко', Difficulty.medium: 'средне', Difficulty.hard: 'сложно'};
-  static const _type = {TaskType.expression: 'вычисли', TaskType.equation: 'уравнение', TaskType.word: 'задача'};
+  static const _type = {
+    TaskType.expression: 'вычисли',
+    TaskType.equation: 'уравнение',
+    TaskType.word: 'задача',
+    TaskType.simplify: 'упрости',
+  };
 
   @override
   Widget build(BuildContext context) {
     final task = widget.stored.task;
     final theme = Theme.of(context);
-    final answer = '${_formatNumber(task.answer)}${task.unit == null ? '' : ' ${task.unit}'}';
+    final answer = '${_formatAnswer(task.answer)}${task.unit == null ? '' : ' ${task.unit}'}';
     return Card(
       color: widget.solved ? theme.colorScheme.secondaryContainer.withValues(alpha: 0.5) : null,
       child: Padding(
@@ -176,13 +182,28 @@ class _TaskCardState extends State<TaskCard> {
   }
 }
 
-/// 12450 -> "12 450", as the textbook writes numbers.
-String _formatNumber(int n) {
-  final s = n.toString();
-  final out = StringBuffer();
-  for (var i = 0; i < s.length; i++) {
-    if (i > 0 && (s.length - i) % 3 == 0) out.write(' ');
-    out.write(s[i]);
+const _superscripts = {'0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹', '-': '⁻'};
+
+/// "x^2+2*a*b-1" -> "x² + 2·a·b − 1", as the textbook writes expressions.
+String formatExpression(String e) {
+  var s = e.replaceAll(' ', '').replaceAllMapped(RegExp(r'\^(-?\d+)'), (m) => m[1]!.split('').map((c) => _superscripts[c]!).join());
+  s = s.replaceAll('*', '·').replaceAll('/', ' : ');
+  // Spaces around binary + and −; a sign at the start or after "(" stays unary.
+  s = s.replaceAllMapped(RegExp(r'(?<=[^(\s])([+-])'), (m) => ' ${m[1] == '-' ? '−' : '+'} ');
+  return s.replaceAll('-', '−');
+}
+
+/// How the textbook writes answers: "12450" -> "12 450", "2.5" -> "2,5", "-7/3" -> "−7/3".
+String _formatAnswer(String answer) {
+  final m = RegExp(r'^(-?)(\d+)([.,]\d+)?(/\d+)?$').firstMatch(answer.trim());
+  if (m == null) return formatExpression(answer);
+  final digits = m[2]!;
+  final out = StringBuffer(m[1]!.isEmpty ? '' : '−');
+  for (var i = 0; i < digits.length; i++) {
+    if (i > 0 && (digits.length - i) % 3 == 0) out.write('\u202f');
+    out.write(digits[i]);
   }
+  out.write((m[3] ?? '').replaceAll('.', ','));
+  out.write(m[4] ?? '');
   return out.toString();
 }

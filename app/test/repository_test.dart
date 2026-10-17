@@ -8,7 +8,7 @@ StoredTask t(String id, DateTime at, Difficulty d, TaskType type) => StoredTask(
       id: id,
       source: 'app',
       createdAt: at,
-      task: MathTask(type: type, difficulty: d, question: id, answer: 1),
+      task: MathTask(type: type, difficulty: d, question: id, answer: '1'),
     );
 
 void main() {

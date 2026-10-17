@@ -1,3 +1,6 @@
+import 'dart:math';
+
+import 'rational.dart';
 import 'task.dart';
 
 /// Result of checking a generated task; [reason] says why it was rejected.
@@ -11,12 +14,8 @@ class Verdict {
 
 final _spaces = RegExp(r'[\s  ]');
 
-/// Checks a task's answer against its machine-checkable form.
-///
-/// Grade 5, part 1 only has natural numbers and zero, so negative or
-/// non-integer intermediate results are rejected too.
-Verdict verifyTask(MathTask task) {
-  if (task.answer < 0) return const Verdict.rejected('отрицательный ответ');
+/// Checks a task's answer against its machine-checkable form, in exact fractions.
+Verdict verifyTask(MathTask task, {Random? random}) {
   try {
     switch (task.type) {
       case TaskType.expression:
@@ -26,85 +25,150 @@ Verdict verifyTask(MathTask task) {
         final missing = _numbers(expr).where((n) => !shown.contains(n)).toList();
         if (missing.isNotEmpty) return Verdict.rejected('в тексте задания нет чисел ${missing.join(', ')}');
         final v = evaluate(expr);
-        return v == task.answer ? const Verdict.ok() : Verdict.rejected('выражение равно $v, а не ${task.answer}');
+        final a = Rational.parse(task.answer);
+        return v == a ? const Verdict.ok() : Verdict.rejected('выражение равно $v, а не ${task.answer}');
       case TaskType.equation:
         final eq = task.equation ?? (throw const FormatException('нет equation'));
         final variable = task.variable ?? (throw const FormatException('нет variable'));
         final sides = eq.split('=');
         if (sides.length != 2) return Verdict.rejected('уравнение без одного знака «=»: $eq');
         if (!sides.join().contains(variable)) return Verdict.rejected('в уравнении нет переменной $variable');
-        String sub(String s) => s.replaceAll(variable, '(${task.answer})');
-        final l = evaluate(sub(sides[0])), r = evaluate(sub(sides[1]));
+        final x = {variable: Rational.parse(task.answer)};
+        final l = evaluate(sides[0], vars: x), r = evaluate(sides[1], vars: x);
         return l == r ? const Verdict.ok() : Verdict.rejected('при ${task.answer}: $l ≠ $r');
       case TaskType.word:
         final v = evaluate(task.solutionExpr ?? (throw const FormatException('нет solution_expr')));
-        return v == task.answer ? const Verdict.ok() : Verdict.rejected('решение даёт $v, а не ${task.answer}');
+        final a = Rational.parse(task.answer);
+        return v == a ? const Verdict.ok() : Verdict.rejected('решение даёт $v, а не ${task.answer}');
+      case TaskType.simplify:
+        final expr = task.expr ?? (throw const FormatException('нет expr'));
+        return sameExpression(expr, task.answer, random: random)
+            ? const Verdict.ok()
+            : Verdict.rejected('«${task.answer}» не равно «$expr»');
     }
   } on FormatException catch (e) {
     return Verdict.rejected(e.message);
   }
 }
 
-/// Numbers as written, with thousands separators removed: "12 450" -> "12450".
-Set<String> _numbers(String text) =>
-    RegExp(r'\d(?:[\d\s  ]*\d)?').allMatches(text).map((m) => m[0]!.replaceAll(_spaces, '')).toSet();
+/// Whether two expressions with variables are equal: compared at several random points.
+bool sameExpression(String a, String b, {Random? random}) {
+  final rnd = random ?? Random();
+  final names = {...variablesOf(a), ...variablesOf(b)};
+  for (var i = 0; i < 5; i++) {
+    final vars = {
+      for (final n in names) n: Rational(BigInt.from(rnd.nextInt(19) - 9), BigInt.from(rnd.nextInt(4) + 1)),
+    };
+    try {
+      if (evaluate(a, vars: vars) != evaluate(b, vars: vars)) return false;
+    } on FormatException catch (e) {
+      if (e.message == 'деление на нуль') continue; // unlucky point, try another
+      rethrow;
+    }
+  }
+  return true;
+}
 
-/// Evaluates + − × : and brackets over natural numbers; throws [FormatException]
-/// on anything else, on negative intermediate results and on inexact division.
-int evaluate(String source) {
-  final s = source
-      .replaceAll(_spaces, '')
-      .replaceAll(RegExp('[–−—]'), '-')
-      .replaceAll(RegExp('[·×]'), '*')
-      .replaceAll(':', '/');
+/// Numbers as written, with thousands separators removed: "12 450" -> "12450".
+Set<String> _numbers(String text) => RegExp(r'\d(?:[\d\s  ]*\d)?(?:[.,]\d+)?')
+    .allMatches(text)
+    .map((m) => m[0]!.replaceAll(_spaces, '').replaceAll(',', '.'))
+    .toSet();
+
+String _clean(String source) => source
+    .replaceAll(_spaces, '')
+    .replaceAll(RegExp('[–−—]'), '-')
+    .replaceAll(RegExp('[·×∙]'), '*')
+    .replaceAll(':', '/')
+    .replaceAll('²', '^2')
+    .replaceAll('³', '^3');
+
+/// Single-letter variables (Latin or Cyrillic) used in [source].
+Set<String> variablesOf(String source) =>
+    RegExp(r'[a-zA-Zа-яА-Я]').allMatches(_clean(source)).map((m) => m[0]!).toSet();
+
+/// Evaluates + − · : ^ and brackets over exact fractions. Numbers may be
+/// decimal ("2,5"); single letters are variables from [vars]; "2a", "3(x+1)"
+/// and "(a+b)(a−b)" mean multiplication. Throws [FormatException] on anything else.
+Rational evaluate(String source, {Map<String, Rational> vars = const {}}) {
+  final s = _clean(source);
   var pos = 0;
 
   Never fail(String what) => throw FormatException('$what в «$source»');
+  bool at(String c) => pos < s.length && s[pos] == c;
+  bool startsAtom() => pos < s.length && RegExp(r'[0-9a-zA-Zа-яА-Я(]').hasMatch(s[pos]);
 
-  late int Function() sum;
+  late Rational Function() sum;
 
-  int atom() {
-    if (pos < s.length && s[pos] == '(') {
+  Rational atom() {
+    if (at('(')) {
       pos++;
       final v = sum();
-      if (pos >= s.length || s[pos] != ')') fail('нет закрывающей скобки');
+      if (!at(')')) fail('нет закрывающей скобки');
       pos++;
       return v;
     }
-    final start = pos;
-    while (pos < s.length && '0123456789'.contains(s[pos])) {
-      pos++;
+    final number = RegExp(r'\d+(?:[.,]\d+)?').matchAsPrefix(s, pos);
+    if (number != null) {
+      pos = number.end;
+      return Rational.parse(number[0]!);
     }
-    if (start == pos) fail('ожидалось число');
-    return int.parse(s.substring(start, pos));
+    if (pos < s.length && RegExp(r'[a-zA-Zа-яА-Я]').hasMatch(s[pos])) {
+      final name = s[pos++];
+      return vars[name] ?? fail('неизвестная переменная $name');
+    }
+    fail('ожидалось число');
   }
 
-  int product() {
-    var v = atom();
-    while (pos < s.length && (s[pos] == '*' || s[pos] == '/')) {
-      final op = s[pos++];
-      final rhs = atom();
-      if (op == '*') {
-        v *= rhs;
+  Rational power() {
+    final base = atom();
+    if (!at('^')) return base;
+    pos++;
+    final negative = at('-');
+    if (negative) pos++;
+    final e = RegExp(r'\d+').matchAsPrefix(s, pos) ?? fail('нужен целый показатель степени');
+    pos = e.end;
+    return base.pow(int.parse(e[0]!) * (negative ? -1 : 1));
+  }
+
+  Rational unary() {
+    if (at('-')) {
+      pos++;
+      return -unary();
+    }
+    if (at('+')) {
+      pos++;
+      return unary();
+    }
+    return power();
+  }
+
+  Rational product() {
+    var v = unary();
+    while (true) {
+      if (at('*') || at('/')) {
+        final op = s[pos++];
+        final rhs = unary();
+        v = op == '*' ? v * rhs : v / rhs;
+      } else if (startsAtom()) {
+        v = v * power(); // implicit: 2a, 3(x+1), (a+b)(a-b)
       } else {
-        if (rhs == 0 || v % rhs != 0) fail('деление нацело невозможно');
-        v ~/= rhs;
+        return v;
       }
     }
-    return v;
   }
 
   sum = () {
     var v = product();
-    while (pos < s.length && (s[pos] == '+' || s[pos] == '-')) {
+    while (at('+') || at('-')) {
       final op = s[pos++];
       final rhs = product();
       v = op == '+' ? v + rhs : v - rhs;
-      if (v < 0) fail('отрицательный промежуточный результат');
     }
     return v;
   };
 
+  if (s.isEmpty) fail('пустое выражение');
   final v = sum();
   if (pos != s.length) fail('лишние символы');
   return v;

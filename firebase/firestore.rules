@@ -2,11 +2,14 @@ rules_version = '2';
 
 // Math Trainer data model
 //
-//   books/{bookId}                      textbook metadata          — backend only (Admin SDK)
-//   topics/{topicId}                    one textbook paragraph     — backend only
-//   topics/{topicId}/tasks/{taskId}     exercises, shared by all   — backend, or created by the app
-//   users/{uid}                         profile                    — owner only
-//   users/{uid}/progress/{progressId}   "solved" marks             — owner only
+//   books/{bookId}                          textbook                         — backend only (Admin SDK)
+//   books/{bookId}/sections/{sectionId}     one § with its rule sheet        — backend only
+//   catalog/grade-{n}                       all sections of a grade, small   — backend only
+//   topics/{sectionId}                      a § a student added to work on   — created by the app
+//   topics/{sectionId}/requests/{uid}       why that student added it        — owner only
+//   topics/{sectionId}/tasks/{taskId}       exercises, shared by all         — backend, or created by the app
+//   users/{uid}                             profile                          — owner only
+//   users/{uid}/progress/{progressId}       "solved" marks                   — owner only
 //
 // The backend writes through the Admin SDK, which bypasses these rules, so
 // everything not opened below is closed for clients.
@@ -21,6 +24,28 @@ service cloud.firestore {
       return !(key in data) || (data[key] is string && data[key].size() <= max);
     }
 
+    function section(bookId, sectionId) {
+      return /databases/$(database)/documents/books/$(bookId)/sections/$(sectionId);
+    }
+
+    // A topic is a textbook section someone added: its id is the section id and
+    // its fields are copied from that section verbatim, so a topic can't be
+    // invented or edited on the way.
+    function validTopic(data, topicId) {
+      let keys = ['bookId', 'grade', 'subject', 'chapter', 'chapterTitle', 'number', 'title', 'rule'];
+      let s = get(section(data.bookId, topicId)).data;
+      return data.keys().hasOnly(keys.concat(['sectionId', 'createdBy', 'createdAt']))
+          && data.keys().hasAll(keys.concat(['sectionId', 'createdBy', 'createdAt']))
+          && data.bookId is string
+          && exists(section(data.bookId, topicId))
+          && data.sectionId == topicId
+          && data.grade == s.grade && data.subject == s.subject
+          && data.chapter == s.chapter && data.chapterTitle == s.chapterTitle
+          && data.number == s.number && data.title == s.title && data.rule == s.rule
+          && data.createdBy == request.auth.uid
+          && data.createdAt == request.time;
+    }
+
     // A task generated on a phone: written once by its author, never changed.
     // The app has already checked the answer (task_verifier.dart); the rules
     // make sure the document has the right shape and author.
@@ -28,10 +53,10 @@ service cloud.firestore {
       return data.keys().hasAll(['type', 'difficulty', 'question', 'answer', 'source', 'createdBy', 'createdAt', 'model'])
           && data.keys().hasOnly(['type', 'difficulty', 'question', 'answer', 'source', 'createdBy', 'createdAt', 'model',
                                   'expr', 'equation', 'variable', 'solution_expr', 'unit'])
-          && data.type in ['expression', 'equation', 'word']
+          && data.type in ['expression', 'equation', 'word', 'simplify']
           && data.difficulty in ['easy', 'medium', 'hard']
           && data.question is string && data.question.size() >= 3 && data.question.size() <= 1000
-          && data.answer is int && data.answer >= 0 && data.answer <= 1000000000000
+          && data.answer is string && data.answer.size() >= 1 && data.answer.size() <= 100
           && data.source == 'app'
           && data.createdBy == request.auth.uid
           && data.createdAt == request.time
@@ -46,10 +71,29 @@ service cloud.firestore {
 
     match /books/{bookId} {
       allow read: if signedIn();
+
+      match /sections/{sectionId} {
+        allow read: if signedIn();
+      }
+    }
+
+    match /catalog/{gradeId} {
+      allow read: if signedIn();
     }
 
     match /topics/{topicId} {
       allow read: if signedIn();
+      allow create: if signedIn() && validTopic(request.resource.data, topicId);
+
+      match /requests/{uid} {
+        allow read: if signedIn() && request.auth.uid == uid;
+        // The topic may be created in the same batch, hence existsAfter.
+        allow create, update: if signedIn() && request.auth.uid == uid
+            && existsAfter(/databases/$(database)/documents/topics/$(topicId))
+            && request.resource.data.keys().hasOnly(['text', 'createdAt'])
+            && request.resource.data.text is string && request.resource.data.text.size() <= 500
+            && request.resource.data.createdAt == request.time;
+      }
 
       match /tasks/{taskId} {
         allow read: if signedIn();

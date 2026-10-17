@@ -1,4 +1,4 @@
-enum TaskType { expression, equation, word }
+enum TaskType { expression, equation, word, simplify }
 
 enum Difficulty { easy, medium, hard }
 
@@ -21,9 +21,11 @@ class MathTask {
   final TaskType type;
   final Difficulty difficulty;
   final String question;
-  final int answer;
 
-  /// expression: the expression to evaluate.
+  /// A number ("12450", "-3/4", "2,5") or, for [TaskType.simplify], an expression ("5a − 3").
+  final String answer;
+
+  /// expression: the expression to evaluate; simplify: the expression to simplify.
   final String? expr;
 
   /// equation: e.g. "x + 309 = 2542", with [variable] = "x".
@@ -34,7 +36,7 @@ class MathTask {
   final String? solutionExpr;
   final String? unit;
 
-  /// Parses one task from the model's JSON; throws [FormatException] when a field is missing.
+  /// Parses one task from JSON; throws [FormatException] when a field is missing.
   factory MathTask.fromJson(Map<String, dynamic> json) {
     T pick<T extends Enum>(List<T> values, Object? name) => values.firstWhere(
           (v) => v.name == name,
@@ -45,14 +47,11 @@ class MathTask {
       return v == null || '$v'.trim().isEmpty ? null : '$v'.trim();
     }
 
-    final question = str('question') ?? (throw const FormatException('no question'));
-    final answer = int.tryParse((str('answer') ?? '').replaceAll(RegExp(r'[\s  ]'), ''));
-    if (answer == null) throw FormatException('answer is not an integer: ${json['answer']}');
     return MathTask(
       type: pick(TaskType.values, json['type']),
       difficulty: pick(Difficulty.values, json['difficulty']),
-      question: question,
-      answer: answer,
+      question: str('question') ?? (throw const FormatException('no question')),
+      answer: str('answer') ?? (throw const FormatException('no answer')),
       expr: str('expr'),
       equation: str('equation'),
       variable: str('variable'),

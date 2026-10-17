@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "seed:topics": "tsx src/cli/seed-topics.ts",
+    "import:books": "tsx src/cli/import-books.ts",
+    "reset:topics": "tsx src/cli/reset-topics.ts",
     "test": "tsx --test test/*.test.ts",
     "typecheck": "tsc --noEmit"
   },

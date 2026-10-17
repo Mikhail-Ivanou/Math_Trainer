@@ -11,7 +11,8 @@ import 'package:math/tasks/task_generator.dart';
 
 const _request = GenerationRequest(
   topicTitle: 'Сложение и вычитание натуральных чисел',
-  excerpt: 'Чтобы найти неизвестное слагаемое, нужно из суммы вычесть известное слагаемое.',
+  rule: 'Чтобы найти неизвестное слагаемое, нужно из суммы вычесть известное слагаемое.',
+  grade: 5,
 );
 
 http.Response _reply(Object content) => http.Response.bytes(
@@ -36,9 +37,9 @@ void main() {
       sent = jsonDecode(req.body) as Map<String, dynamic>;
       return _reply('```json\n${jsonEncode({
             'tasks': [
-              {'type': 'expression', 'difficulty': 'easy', 'question': 'Вычислите: 4 500 + 1 275', 'expr': '4500+1275', 'answer': 5775},
-              {'type': 'expression', 'difficulty': 'easy', 'question': 'Вычислите: 4 500 + 1 275', 'expr': '4500+1275', 'answer': 5776},
-              {'type': 'word', 'difficulty': 'medium', 'question': 'q', 'answer': 'много'},
+              {'type': 'expression', 'difficulty': 'easy', 'question': 'Вычислите: 4 500 + 1 275', 'expr': '4500+1275', 'answer': '5775'},
+              {'type': 'expression', 'difficulty': 'easy', 'question': 'Вычислите: 4 500 + 1 275', 'expr': '4500+1275', 'answer': '5776'},
+              {'type': 'word', 'difficulty': 'medium', 'question': 'q', 'solution_expr': '2+2', 'answer': 'много'},
             ],
           })}\n```');
     });
@@ -46,7 +47,7 @@ void main() {
 
     expect(sent['model'], 'claude-haiku-5.5');
     expect((sent['messages'] as List).last['content'], contains('Сложение и вычитание'));
-    expect(result.tasks.map((t) => t.answer), [5775]);
+    expect(result.tasks.map((t) => t.answer), ['5775']);
     expect(result.rejected, hasLength(2));
     expect(result.usage?.completionTokens, 300);
   });

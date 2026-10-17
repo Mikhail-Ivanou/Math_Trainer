@@ -15,7 +15,7 @@ void main() {
         type: TaskType.word,
         difficulty: Difficulty.medium,
         question: 'В двух вазах 24 конфеты…',
-        answer: 12450,
+        answer: '12450',
         unit: 'конфет',
       ),
     );
@@ -33,5 +33,12 @@ void main() {
 
     await tester.tap(find.byType(Checkbox));
     expect(marks, [true]);
+  });
+
+  test('expressions are shown the textbook way', () {
+    expect(formatExpression('x^2+16'), 'x² + 16');
+    expect(formatExpression('a^2-2*a*b+b^2'), 'a² − 2·a·b + b²');
+    expect(formatExpression('-3x+(-2)'), '−3x + (−2)');
+    expect(formatExpression('2^-2'), '2⁻²');
   });
 }
