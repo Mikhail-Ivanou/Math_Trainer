@@ -34,6 +34,51 @@ math-trainer/
   пользователя и генерирует новые примеры. LLM вызывается напрямую через
   api.aiai.by, наш бэкенд для этого не нужен.
 
+## Данные (Firestore)
+
+База `(default)` в `europe-central2`. Правила лежат в
+[firebase/firestore.rules](firebase/firestore.rules), их проверяют тесты на эмуляторе.
+
+| Путь | Что | Кто пишет |
+|---|---|---|
+| `books/{bookId}` | учебник | backend |
+| `topics/{topicId}` | параграф: глава, номер, название, страницы, `theory` | backend |
+| `topics/{topicId}/tasks/{taskId}` | задания, общие для всех | backend и приложение (только создание) |
+| `users/{uid}` | профиль | владелец |
+| `users/{uid}/progress/{topicId}__{taskId}` | отметка «решено» | владелец |
+
+Задание, созданное в приложении, правила принимают только целиком: тип,
+сложность, текст, целый ответ ≥ 0, `source: "app"`, `createdBy` — uid автора,
+`createdAt` — время сервера, тема существует. Менять и удалять задания
+клиенты не могут.
+
+```bash
+cd firebase && npm install
+JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" npm run test:rules
+firebase deploy --only firestore:rules,firestore:indexes   # из корня репозитория
+```
+
+## Backend
+
+`backend/` разбирает PDF учебника на темы по параграфам. Названия, главы и
+страницы берёт из «Содержания», теорию — от заголовка «§ N.» до «Решаем
+вместе», упражнения — после него. Результат публикует в Firestore.
+
+```bash
+cd backend && npm install
+npm run seed:topics -- --dry-run   # только data/topics-math5-1.json
+npm run seed:topics                # + books/ и topics/ в Firestore
+npm test
+```
+
+Для записи в Firestore нужен ключ сервисного аккаунта: Firebase Console →
+Project settings → Service accounts → Generate new private key. Сохранить его
+как `backend/service-account.json`, он в .gitignore.
+
+Ограничение извлечения: знак умножения «·» в этом PDF не извлекается
+(«10 · 4» превращается в «10  4»). Для теории как контекста LLM это
+некритично, но упражнения из книги так дословно брать нельзя.
+
 ## LLM
 
 Провайдер — [aiai.by](https://aiai.by) (API, совместимый с OpenAI). Модель по

@@ -2,7 +2,7 @@
 .DS_Store
 
 # Textbooks and other local data (copyrighted, not committed)
-data/
+/data/
 
 # Secrets
 .env
@@ -18,3 +18,8 @@ node_modules/
 .idea/
 .vscode/
 *.iml
+
+# Firebase emulator logs
+firebase-debug.log
+firestore-debug.log
+ui-debug.log

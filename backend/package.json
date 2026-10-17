@@ -1,0 +1,19 @@
+{
+  "name": "math-trainer-backend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "seed:topics": "tsx src/cli/seed-topics.ts",
+    "test": "tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "firebase-admin": "^14.5.0",
+    "pdf-parse": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}

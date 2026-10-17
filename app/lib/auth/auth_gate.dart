@@ -1,15 +1,19 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../data/repository.dart';
 import '../home_screen.dart';
+import '../tasks/task_generator.dart';
 import 'auth_service.dart';
 import 'sign_in_screen.dart';
 
 /// Shows the sign-in screen until Firebase has a user, then the app.
 class AuthGate extends StatelessWidget {
-  const AuthGate({super.key, required this.auth});
+  const AuthGate({super.key, required this.auth, required this.repo, required this.generator});
 
   final FirebaseAuthService auth;
+  final Repository repo;
+  final TaskGenerator? generator;
 
   @override
   Widget build(BuildContext context) {
@@ -20,7 +24,9 @@ class AuthGate extends StatelessWidget {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
         final user = snapshot.data;
-        return user == null ? SignInScreen(auth: auth) : HomeScreen(user: user, onSignOut: auth.signOut);
+        return user == null
+            ? SignInScreen(auth: auth)
+            : HomeScreen(user: user, repo: repo, generator: generator, onSignOut: auth.signOut);
       },
     );
   }

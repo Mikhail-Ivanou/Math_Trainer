@@ -1,0 +1,13 @@
+{
+  "name": "math-trainer-firebase",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:rules": "cd .. && firebase emulators:exec --only firestore --project demo-math-trainer \"$npm_node_execpath --test firebase/test/\"",
+    "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^6.0.0",
+    "firebase": "^13.0.0"
+  }
+}

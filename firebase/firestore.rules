@@ -1,0 +1,74 @@
+rules_version = '2';
+
+// Math Trainer data model
+//
+//   books/{bookId}                      textbook metadata          — backend only (Admin SDK)
+//   topics/{topicId}                    one textbook paragraph     — backend only
+//   topics/{topicId}/tasks/{taskId}     exercises, shared by all   — backend, or created by the app
+//   users/{uid}                         profile                    — owner only
+//   users/{uid}/progress/{progressId}   "solved" marks             — owner only
+//
+// The backend writes through the Admin SDK, which bypasses these rules, so
+// everything not opened below is closed for clients.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function optionalString(data, key, max) {
+      return !(key in data) || (data[key] is string && data[key].size() <= max);
+    }
+
+    // A task generated on a phone: written once by its author, never changed.
+    // The app has already checked the answer (task_verifier.dart); the rules
+    // make sure the document has the right shape and author.
+    function validAppTask(data, topicId) {
+      return data.keys().hasAll(['type', 'difficulty', 'question', 'answer', 'source', 'createdBy', 'createdAt', 'model'])
+          && data.keys().hasOnly(['type', 'difficulty', 'question', 'answer', 'source', 'createdBy', 'createdAt', 'model',
+                                  'expr', 'equation', 'variable', 'solution_expr', 'unit'])
+          && data.type in ['expression', 'equation', 'word']
+          && data.difficulty in ['easy', 'medium', 'hard']
+          && data.question is string && data.question.size() >= 3 && data.question.size() <= 1000
+          && data.answer is int && data.answer >= 0 && data.answer <= 1000000000000
+          && data.source == 'app'
+          && data.createdBy == request.auth.uid
+          && data.createdAt == request.time
+          && data.model is string && data.model.size() <= 100
+          && optionalString(data, 'expr', 300)
+          && optionalString(data, 'equation', 300)
+          && optionalString(data, 'variable', 10)
+          && optionalString(data, 'solution_expr', 300)
+          && optionalString(data, 'unit', 50)
+          && exists(/databases/$(database)/documents/topics/$(topicId));
+    }
+
+    match /books/{bookId} {
+      allow read: if signedIn();
+    }
+
+    match /topics/{topicId} {
+      allow read: if signedIn();
+
+      match /tasks/{taskId} {
+        allow read: if signedIn();
+        allow create: if signedIn() && validAppTask(request.resource.data, topicId);
+      }
+    }
+
+    match /users/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+
+      match /progress/{progressId} {
+        allow read, delete: if signedIn() && request.auth.uid == uid;
+        allow create, update: if signedIn() && request.auth.uid == uid
+            && request.resource.data.keys().hasOnly(['topicId', 'taskId', 'solved', 'updatedAt'])
+            && request.resource.data.topicId is string
+            && request.resource.data.taskId is string
+            && request.resource.data.solved is bool
+            && request.resource.data.updatedAt == request.time;
+      }
+    }
+  }
+}
