@@ -43,3 +43,6 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# aiai.by key and other build-time secrets (see secrets.example.json)
+/secrets.json

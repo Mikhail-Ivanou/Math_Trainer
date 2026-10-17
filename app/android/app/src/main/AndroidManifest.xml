@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Firebase and task generation through api.aiai.by. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="Math Trainer"
         android:name="${applicationName}"

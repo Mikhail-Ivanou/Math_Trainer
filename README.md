@@ -21,7 +21,7 @@ math-trainer/
 ```
  data/*.pdf ──► backend ──► Firestore ◄── app (Android / iOS)
                   ▲            ▲             │
-                  │            │             └─► LLM через Firebase AI Logic
+                  │            │             └─► LLM: api.aiai.by (свой ключ с лимитом)
                  web ──────────┘
 ```
 
@@ -31,9 +31,37 @@ math-trainer/
 - **web** показывает RAG и опубликованный контент, генерирует новые примеры
   через бэкенд (LLM + RAG по книге) и экспортирует выбранные примеры в PDF для печати.
 - **app** читает темы и примеры из Firestore, хранит отметки «решено» у
-  пользователя и генерирует новые примеры. LLM вызывается через Firebase
-  AI Logic (`firebase_ai`), поэтому ключ LLM в приложение не попадает и наш
-  бэкенд не нужен.
+  пользователя и генерирует новые примеры. LLM вызывается напрямую через
+  api.aiai.by, наш бэкенд для этого не нужен.
+
+## LLM
+
+Провайдер — [aiai.by](https://aiai.by) (API, совместимый с OpenAI). Модель по
+умолчанию — `claude-haiku-5.5`. Её выбрали по сравнению 10 моделей на генерации
+заданий по § 8: все ответы верные, задачи самые разнообразные и жизненные,
+~13 с на 12 заданий, ~1,3 BYN за 1000 заданий.
+
+Каждое задание приходит с проверяемой формой (`expr`, `equation` или
+`solution_expr`). Приложение само вычисляет ответ
+(`app/lib/tasks/task_verifier.dart`) и отбрасывает задания, где модель ошиблась
+или не вписала выражение в текст задания.
+
+**Ключ в приложении.** Ключ вшивается в сборку, а из APK его можно достать.
+Поэтому в приложении используется **отдельный ключ aiai.by с лимитом расходов**,
+а не ключ бэкенда. Если ключ утечёт, его перевыпускают в кабинете aiai.by и
+пересобирают приложение. В git ключ не попадает:
+
+```bash
+cp app/secrets.example.json app/secrets.json   # вписать AIAI_API_KEY
+cd app && flutter run --dart-define-from-file=secrets.json
+cd app && flutter build apk --release --dart-define-from-file=secrets.json
+```
+
+Проверка на настоящем API (ключ берётся из окружения, в приложение не вшивается):
+
+```bash
+cd app && AIAI_API_KEY=... flutter test test/task_generator_test.dart
+```
 
 ## Мобильное приложение
 
@@ -45,7 +73,7 @@ math-trainer/
 - Минимальные версии: iOS 15 (требование Firebase), Android minSdk 24.
 
 ```bash
-cd app && flutter run
+cd app && flutter run --dart-define-from-file=secrets.json
 ```
 
 ## Учебник
