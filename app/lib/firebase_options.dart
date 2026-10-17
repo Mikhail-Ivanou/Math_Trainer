@@ -56,13 +56,14 @@ class DefaultFirebaseOptions {
     projectId: 'math-traineer',
     storageBucket: 'math-traineer.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyDWr8il1hFQSHnPC_496yuXnc6xNM4Rjss',
     appId: '1:261356293223:ios:7836da0cbf85fa8f9158c2',
     messagingSenderId: '261356293223',
     projectId: 'math-traineer',
     storageBucket: 'math-traineer.firebasestorage.app',
+    androidClientId: '261356293223-9e7h4b9ribmtsctofhg288g0ll1mlrdr.apps.googleusercontent.com',
+    iosClientId: '261356293223-bsog2938v3nebhshds9h3ttn732n7r3n.apps.googleusercontent.com',
     iosBundleId: 'com.agidel2012.math',
   );
 }

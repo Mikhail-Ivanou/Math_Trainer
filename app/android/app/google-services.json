@@ -12,7 +12,20 @@
           "package_name": "com.agidel2012.math"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "261356293223-9e7h4b9ribmtsctofhg288g0ll1mlrdr.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.agidel2012.math",
+            "certificate_hash": "048570d9b41e2dbcf256c6c9c0c7b8e7d4efe129"
+          }
+        },
+        {
+          "client_id": "261356293223-sn3brh1m5227cae3kc4km8tmlrm50lhi.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyD7AYKsBqs6kWd6PZZPnUiLTXG42-C5ajI"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "261356293223-sn3brh1m5227cae3kc4km8tmlrm50lhi.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "261356293223-bsog2938v3nebhshds9h3ttn732n7r3n.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.agidel2012.math"
+              }
+            }
+          ]
         }
       }
     }
