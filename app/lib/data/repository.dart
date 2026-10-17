@@ -20,11 +20,22 @@ class Repository {
       .snapshots()
       .map((s) => s.docs.map((d) => Topic.fromFirestore(d.id, d.data())).toList());
 
-  /// Newest first; documents that don't parse are skipped rather than breaking the list.
+  /// Newest batch first, easy to hard inside a batch (a batch shares one server
+  /// timestamp). Documents that don't parse are skipped rather than breaking the list.
   Stream<List<StoredTask>> tasks(String topicId) =>
-      _tasks(topicId).orderBy('createdAt', descending: true).snapshots().map((s) => [
+      _tasks(topicId).orderBy('createdAt', descending: true).snapshots().map((s) => sortTasks([
             for (final d in s.docs) ?_parse(d),
-          ]);
+          ]));
+
+  static List<StoredTask> sortTasks(List<StoredTask> tasks) => tasks
+    ..sort((a, b) {
+      final byTime = (b.createdAt ?? DateTime(0)).compareTo(a.createdAt ?? DateTime(0));
+      if (byTime != 0) return byTime;
+      final byDifficulty = a.task.difficulty.index.compareTo(b.task.difficulty.index);
+      if (byDifficulty != 0) return byDifficulty;
+      final byType = a.task.type.index.compareTo(b.task.type.index);
+      return byType != 0 ? byType : a.id.compareTo(b.id);
+    });
 
   StoredTask? _parse(QueryDocumentSnapshot<Map<String, dynamic>> d) {
     final data = d.data();
