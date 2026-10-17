@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "261356293223",
+    "project_id": "math-traineer",
+    "storage_bucket": "math-traineer.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:261356293223:android:94a1a403741962709158c2",
+        "android_client_info": {
+          "package_name": "com.agidel2012.math"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD7AYKsBqs6kWd6PZZPnUiLTXG42-C5ajI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
