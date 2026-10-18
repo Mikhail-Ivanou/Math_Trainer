@@ -27,6 +27,21 @@ class _TopicScreenState extends State<TopicScreen> {
   late final Stream<Set<String>> _solved = widget.repo.solvedTaskIds(widget.user.uid, widget.topic.id);
   bool _generating = false;
   Difficulty _level = Difficulty.medium;
+  bool _hideSolved = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // The choice is kept in users/{uid}, so it holds across topics and launches.
+    widget.repo.hideSolved(widget.user.uid).then((v) {
+      if (mounted) setState(() => _hideSolved = v);
+    }, onError: (_) {});
+  }
+
+  void _toggleHideSolved(bool v) {
+    setState(() => _hideSolved = v);
+    widget.repo.saveHideSolved(widget.user.uid, v);
+  }
   // The paragraph's whole rule sheet: background for generation and «Весь параграф».
   late final Future<String> _sectionSheet = widget.repo.sectionSheet(widget.topic).catchError((_) => '');
 
@@ -120,20 +135,39 @@ class _TopicScreenState extends State<TopicScreen> {
               );
             }
             final done = tasks.where((s) => solved.contains(s.id)).length;
+            final shown = _hideSolved ? tasks.where((s) => !solved.contains(s.id)).toList() : tasks;
+            final header = Padding(
+              padding: const EdgeInsets.fromLTRB(4, 0, 0, 4),
+              child: Row(children: [
+                Expanded(child: Text('Решено $done из ${tasks.length}', style: Theme.of(context).textTheme.labelLarge)),
+                FilterChip(
+                  label: const Text('Скрыть решённые'),
+                  selected: _hideSolved,
+                  onSelected: _toggleHideSolved,
+                ),
+              ]),
+            );
             return ListView.builder(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
-              itemCount: tasks.length + 1,
+              itemCount: shown.length + (shown.isEmpty ? 2 : 1),
               itemBuilder: (context, i) => i == 0
-                  ? Padding(
-                      padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
-                      child: Text('Решено $done из ${tasks.length}', style: Theme.of(context).textTheme.labelLarge),
-                    )
-                  : TaskCard(
-                      key: ValueKey(tasks[i - 1].id),
-                      stored: tasks[i - 1],
-                      solved: solved.contains(tasks[i - 1].id),
-                      onSolved: (v) => widget.repo.setSolved(widget.user.uid, t.id, tasks[i - 1].id, v),
-                    ),
+                  ? header
+                  : shown.isEmpty
+                      ? Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Text(
+                            widget.generator == null
+                                ? 'Все задания решены!'
+                                : 'Все задания решены! Нажмите «Новые задания», чтобы получить ещё.',
+                            textAlign: TextAlign.center,
+                          ),
+                        )
+                      : TaskCard(
+                          key: ValueKey(shown[i - 1].id),
+                          stored: shown[i - 1],
+                          solved: solved.contains(shown[i - 1].id),
+                          onSolved: (v) => widget.repo.setSolved(widget.user.uid, t.id, shown[i - 1].id, v),
+                        ),
             );
           },
         ),

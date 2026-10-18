@@ -159,4 +159,10 @@ class Repository {
   Future<int?> lastGrade(String uid) async => ((await _db.doc('users/$uid').get()).data()?['grade'] as num?)?.toInt();
 
   Future<void> saveGrade(String uid, int grade) => _db.doc('users/$uid').set({'grade': grade}, SetOptions(merge: true));
+
+  /// Whether this student hides solved tasks (users/{uid}.hideSolved).
+  Future<bool> hideSolved(String uid) async => (await _db.doc('users/$uid').get()).data()?['hideSolved'] == true;
+
+  Future<void> saveHideSolved(String uid, bool hide) =>
+      _db.doc('users/$uid').set({'hideSolved': hide}, SetOptions(merge: true));
 }
