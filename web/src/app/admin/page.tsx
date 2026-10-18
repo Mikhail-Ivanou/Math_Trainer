@@ -11,6 +11,7 @@ export interface AdminBook {
   title: string;
   grade: number;
   subject: string;
+  subjectName?: string;
   authors: string;
   year: number;
   portalId: number;
@@ -107,7 +108,7 @@ export default function AdminPage() {
                 <div className="text-sm text-gray-600">{b.grade} класс · {b.sectionCount ?? 0} § · тем у учеников: {b.topicCount}</div>
               </div>
               <div className="text-xs text-gray-500">
-                {subjectNames[b.subject] ?? b.subject} · {b.authors} · {b.year}{b.portalId ? ` · adu.by ${b.portalId}` : ''}{b.hasPdf ? '' : ' · нет PDF в data/'}
+                {b.subjectName ?? subjectNames[b.subject] ?? b.subject} · {b.authors} · {b.year}{b.portalId ? ` · adu.by ${b.portalId}` : ''}{b.hasPdf ? '' : ' · нет PDF в data/'}
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
                 <button className="link" onClick={() => setOpen(open === b.id ? null : b.id)}>{open === b.id ? 'Закрыть параграфы' : 'Параграфы и правила'}</button>
@@ -171,21 +172,23 @@ export default function AdminPage() {
 }
 
 function AddBook({ disabled, onAdded }: { disabled: boolean; onAdded: () => void }) {
-  const [f, setF] = useState({ id: '', title: '', grade: '8', subject: 'algebra', authors: '', year: String(new Date().getFullYear()), portalId: '' });
+  const [portalId, setPortalId] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF({ ...f, [k]: e.target.value });
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError('');
     try {
-      const q = new URLSearchParams(Object.entries(f).filter(([, v]) => v));
-      await api(`/api/admin/books?${q}`, file ? { method: 'POST', body: file, headers: { 'content-type': 'application/pdf' } } : { method: 'POST' });
+      await api(
+        file ? '/api/admin/books' : `/api/admin/books?portalId=${encodeURIComponent(portalId.trim())}`,
+        file ? { method: 'POST', body: file, headers: { 'content-type': 'application/pdf' } } : { method: 'POST' },
+      );
       setFile(null);
-      setF({ ...f, id: '', title: '', authors: '', portalId: '' });
+      setPortalId('');
+      (e.target as HTMLFormElement).reset();
       onAdded();
     } catch (e) {
       setError((e as Error).message);
@@ -198,24 +201,22 @@ function AddBook({ disabled, onAdded }: { disabled: boolean; onAdded: () => void
     <details className="card mt-4">
       <summary className="cursor-pointer font-medium">+ Добавить учебник</summary>
       <form onSubmit={submit} className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <label className="text-sm">id (латиница)<input className="input" placeholder="algebra8" value={f.id} onChange={set('id')} required /></label>
-        <label className="text-sm">Название<input className="input" placeholder="Алгебра. 8 класс" value={f.title} onChange={set('title')} required /></label>
-        <label className="text-sm">Класс<input className="input" type="number" min={5} max={11} value={f.grade} onChange={set('grade')} /></label>
-        <label className="text-sm">Предмет
-          <select className="input" value={f.subject} onChange={set('subject')}>
-            {Object.entries(subjectNames).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-          </select>
+        <label className="text-sm">id книги на e-padruchnik.adu.by
+          <input className="input" inputMode="numeric" placeholder="например 966" value={portalId} disabled={!!file}
+            onChange={(e) => setPortalId(e.target.value.replace(/\D/g, ''))} />
         </label>
-        <label className="text-sm">Авторы<input className="input" value={f.authors} onChange={set('authors')} /></label>
-        <label className="text-sm">Год<input className="input" type="number" value={f.year} onChange={set('year')} /></label>
-        <label className="text-sm">id на e-padruchnik.adu.by<input className="input" placeholder="например 966" value={f.portalId} onChange={set('portalId')} /></label>
-        <label className="text-sm">или PDF-файл<input className="input" type="file" accept="application/pdf" onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></label>
+        <label className="text-sm">или PDF-файл
+          <input className="input" type="file" accept="application/pdf" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+        </label>
         <p className="text-xs text-gray-600 sm:col-span-2">
-          После добавления книга обрабатывается сразу: оглавление, параграфы, листы и правила (LLM, ключ бэкенда), затем публикуется в каталог класса.
-          Новый класс сразу появится на сайте и в приложении.
+          Название, предмет, класс, часть, авторов и год сервер берёт из самой книги (титульные страницы и выходные данные), из них же
+          составляет id (например physics8, chemistry9-1). Затем книга обрабатывается: оглавление, параграфы, листы и правила
+          (LLM, ключ бэкенда) — и попадает в каталог своего класса на сайте и в приложении. Ход обработки — в «Обработка» ниже.
         </p>
         {error && <p className="text-sm text-red-600 sm:col-span-2">{error}</p>}
-        <div className="sm:col-span-2"><button className="btn-primary" disabled={disabled || busy || (!file && !f.portalId)}>{busy ? 'Загружаю…' : 'Добавить и обработать'}</button></div>
+        <div className="sm:col-span-2">
+          <button className="btn-primary" disabled={disabled || busy || (!file && !portalId)}>{busy ? 'Загружаю…' : 'Добавить и обработать'}</button>
+        </div>
       </form>
     </details>
   );

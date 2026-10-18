@@ -10,6 +10,8 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import { getAuth } from 'firebase-admin/auth';
 import { existsSync, writeFileSync } from 'node:fs';
 import { BOOKS, type BookConfig } from './book/books.js';
+import { bookId, bookMeta } from './book/llm-steps.js';
+import { pdfPages } from './book/pdf-text.js';
 import { adminFirestore } from './firestore.js';
 import {
   addRule,
@@ -73,27 +75,62 @@ interface Job {
 const jobs: Job[] = [];
 
 function startJob(book: BookConfig, opts: { fresh: boolean }) {
-  const job: Job = { id: `${Date.now()}`, bookId: book.id, status: 'running', log: [], startedAt: new Date().toISOString() };
-  jobs.unshift(job);
-  const log = (line: string) => job.log.push(`${new Date().toLocaleTimeString('ru-RU')} ${line}`);
-  (async () => {
+  const { job, log, finish } = newJob(book.id);
+  finish((async () => {
     if (opts.fresh) {
       clearCaches(book.id);
       log('кэш LLM очищен');
     }
     const sections = await processBook(book, log);
     await publishBook(db, book, sections, log);
-  })().then(
-    () => {
-      job.status = 'done';
-      job.finishedAt = new Date().toISOString();
-    },
-    (e: Error) => {
-      job.status = 'failed';
-      job.finishedAt = new Date().toISOString();
-      log(`ошибка: ${e.message}`);
-    },
-  );
+  })());
+  return job;
+}
+
+function newJob(label: string) {
+  const job: Job = { id: `${Date.now()}`, bookId: label, status: 'running', log: [], startedAt: new Date().toISOString() };
+  jobs.unshift(job);
+  const log = (line: string) => job.log.push(`${new Date().toLocaleTimeString('ru-RU')} ${line}`);
+  const finish = (p: Promise<unknown>) =>
+    p.then(
+      () => {
+        job.status = 'done';
+        job.finishedAt = new Date().toISOString();
+      },
+      (e: Error) => {
+        job.status = 'failed';
+        job.finishedAt = new Date().toISOString();
+        log(`ошибка: ${e.message}`);
+      },
+    );
+  return { job, log, finish };
+}
+
+/** Reads the book's metadata from its pages, registers it under a fresh id, processes and publishes it. */
+function startNewBookJob(pdf: Buffer, portalId: number) {
+  const { job, log, finish } = newJob('новая книга');
+  finish((async () => {
+    log(portalId ? `скачан PDF с портала (id ${portalId}), ${(pdf.length / 1e6).toFixed(1)} МБ` : `загружен PDF, ${(pdf.length / 1e6).toFixed(1)} МБ`);
+    const meta = await bookMeta(await pdfPages(pdf));
+    const id = bookId(meta, new Set((await db.collection('books').get()).docs.map((d) => d.id)));
+    job.bookId = id;
+    log(`это «${meta.title}» (${meta.subjectName}, ${meta.grade} класс${meta.part ? `, часть ${meta.part}` : ''}), ${meta.authors}, ${meta.year} → id ${id}`);
+    const book: BookConfig & { subjectName: string } = {
+      id,
+      file: `${id}.pdf`,
+      grade: meta.grade,
+      subject: meta.subject,
+      subjectName: meta.subjectName,
+      title: meta.title,
+      authors: meta.authors,
+      year: meta.year,
+      portalId,
+    };
+    writeFileSync(DATA + book.file, pdf);
+    await db.doc(`books/${id}`).set({ ...book, sectionCount: 0 });
+    const sections = await processBook(book, log);
+    await publishBook(db, book, sections, log);
+  })());
   return job;
 }
 
@@ -113,38 +150,29 @@ app.get('/api/admin/books', route(async () => {
   };
 }));
 
-/** New book: metadata as query params, the PDF as the body — or `portalId` to download from adu.by. */
+/**
+ * New book: the PDF as the body, or `?portalId=` to download it from
+ * e-padruchnik.adu.by. Everything else (title, subject, grade, part, authors,
+ * year, id) is read from the book itself in the processing job.
+ */
 app.post('/api/admin/books', express.raw({ type: 'application/pdf', limit: '300mb' }), route(async (req) => {
-  const q = req.query as Record<string, string>;
-  const id = (q.id ?? '').trim();
-  if (!/^[a-z0-9-]{2,30}$/.test(id)) throw Object.assign(new Error('id: латиница, цифры и «-», например math8'), { status: 400 });
-  if ((await db.doc(`books/${id}`).get()).exists) throw Object.assign(new Error(`книга ${id} уже есть`), { status: 409 });
-  const book: BookConfig = {
-    id,
-    file: `${id}.pdf`,
-    grade: Number(q.grade),
-    subject: (q.subject as BookConfig['subject']) ?? 'math',
-    title: q.title ?? id,
-    authors: q.authors ?? '',
-    year: Number(q.year) || new Date().getFullYear(),
-    portalId: Number(q.portalId) || 0,
-  };
-  if (![5, 6, 7, 8, 9, 10, 11].includes(book.grade)) throw Object.assign(new Error('класс 5–11'), { status: 400 });
+  const portalId = Number((req.query as Record<string, string>).portalId) || 0;
+  let pdf: Buffer;
   if (Buffer.isBuffer(req.body) && req.body.length) {
-    writeFileSync(DATA + book.file, req.body);
-  } else if (book.portalId) {
+    pdf = req.body;
+  } else if (portalId) {
+    const taken = (await db.collection('books').where('portalId', '==', portalId).get()).docs[0];
+    if (taken) throw Object.assign(new Error(`книга ${portalId} с портала уже есть: ${taken.id}`), { status: 409 });
     const form = new FormData();
-    form.set('id', String(book.portalId));
+    form.set('id', String(portalId));
     form.set('getbook', '');
     const r = await fetch('https://e-padruchnik.adu.by/', { method: 'POST', body: form });
-    const pdf = Buffer.from(await r.arrayBuffer());
-    if (!r.ok || pdf.subarray(0, 5).toString() !== '%PDF-') throw new Error(`портал не отдал PDF для id ${book.portalId}`);
-    writeFileSync(DATA + book.file, pdf);
+    pdf = Buffer.from(await r.arrayBuffer());
   } else {
     throw Object.assign(new Error('нужен PDF или id книги на портале'), { status: 400 });
   }
-  await db.doc(`books/${id}`).set({ ...book, sectionCount: 0 });
-  return { book, job: startJob(book, { fresh: true }) };
+  if (pdf.subarray(0, 5).toString() !== '%PDF-') throw Object.assign(new Error(portalId ? `портал не отдал PDF для id ${portalId}` : 'это не PDF'), { status: 400 });
+  return { job: startNewBookJob(pdf, portalId) };
 }));
 
 app.post('/api/admin/books/:id/process', route(async (req) => {

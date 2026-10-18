@@ -37,14 +37,19 @@ class GenerationRequest {
   Map<TaskType, int> get counts =>
       _counts ??
       switch ((subject, level)) {
+        // Outside maths only calculation problems: their number answer is what can be checked.
         ('geometry', Difficulty.expert) => {TaskType.word: 6},
         ('geometry', _) => {TaskType.word: 8},
+        (final s, Difficulty.expert) when !_mathLike.contains(s) => {TaskType.word: 6},
+        (final s, _) when !_mathLike.contains(s) => {TaskType.word: 8},
         ('algebra', Difficulty.expert) => {TaskType.expression: 1, TaskType.equation: 2, TaskType.simplify: 2, TaskType.word: 1},
         ('algebra', _) => {TaskType.expression: 2, TaskType.equation: 2, TaskType.simplify: 3, TaskType.word: 1},
         (_, Difficulty.expert) => {TaskType.expression: 2, TaskType.equation: 2, TaskType.word: 2},
         _ => {TaskType.expression: 3, TaskType.equation: 2, TaskType.word: 3},
       };
 }
+
+const _mathLike = {'math', 'algebra', 'geometry'};
 
 /// What each level means, for the model and for the level picker.
 const levelNames = {
@@ -138,7 +143,7 @@ class TaskGenerator {
     final total = r.counts.values.fold(0, (a, b) => a + b);
     final lines = [
       for (final MapEntry(key: type, value: n) in r.counts.entries)
-        if (n > 0) '- $n заданий type "${type.name}" — ${_typeHint[type]}',
+        if (n > 0) '- $n заданий type "${type.name}" — ${type == TaskType.word ? _wordHint(r.subject) : _typeHint[type]}',
     ];
     return '''
 Правило «${r.topicTitle}»:
@@ -175,9 +180,21 @@ ${lines.join('\n')}
     TaskType.word: 'текстовая задача с числовым ответом',
   };
 
+  static String _wordHint(String subject) => _mathLike.contains(subject)
+      ? _typeHint[TaskType.word]!
+      : 'расчётная задача по теме с числовым ответом; в unit — единица ответа (м/с, Н, г, моль…); в solution_expr — вычисление ответа из чисел условия';
+
+  // Same list as SUBJECTS in backend/src/book/books.ts.
   static String _subjectName(String subject) => switch (subject) {
+        'math' => 'математики',
         'algebra' => 'алгебры',
         'geometry' => 'геометрии',
-        _ => 'математики',
+        'physics' => 'физики',
+        'chemistry' => 'химии',
+        'biology' => 'биологии',
+        'informatics' => 'информатики',
+        'geography' => 'географии',
+        'astronomy' => 'астрономии',
+        _ => 'предмета',
       };
 }

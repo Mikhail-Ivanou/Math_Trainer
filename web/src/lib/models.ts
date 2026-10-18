@@ -49,7 +49,17 @@ export interface Topic {
   sectionTitle: string;
 }
 
-export const subjectNames: Record<string, string> = { math: 'Математика', algebra: 'Алгебра', geometry: 'Геометрия' };
+export const subjectNames: Record<string, string> = {
+  math: 'Математика',
+  algebra: 'Алгебра',
+  geometry: 'Геометрия',
+  physics: 'Физика',
+  chemistry: 'Химия',
+  biology: 'Биология',
+  informatics: 'Информатика',
+  geography: 'География',
+  astronomy: 'Астрономия',
+};
 
 export const levelNames: Record<Difficulty, string> = { easy: 'Лёгкий', medium: 'Средний', hard: 'Сложный', expert: 'Максимальный' };
 

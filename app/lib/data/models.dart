@@ -1,6 +1,16 @@
 import '../tasks/task.dart';
 
-const subjectNames = {'math': 'Математика', 'algebra': 'Алгебра', 'geometry': 'Геометрия'};
+const subjectNames = {
+  'math': 'Математика',
+  'algebra': 'Алгебра',
+  'geometry': 'Геометрия',
+  'physics': 'Физика',
+  'chemistry': 'Химия',
+  'biology': 'Биология',
+  'informatics': 'Информатика',
+  'geography': 'География',
+  'astronomy': 'Астрономия',
+};
 
 /// One rule of a textbook paragraph as listed in `catalog/grade-{n}`: enough to match a request.
 class CatalogRule {

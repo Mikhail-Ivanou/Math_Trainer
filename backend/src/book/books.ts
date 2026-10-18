@@ -1,9 +1,28 @@
-/** Textbooks of the reference library (all from https://e-padruchnik.adu.by/, Russian-language editions). */
+/** Subject codes and their names; a book of another subject keeps its code with the name from the book. */
+export const SUBJECTS: Record<string, { name: string; genitive: string }> = {
+  math: { name: 'Математика', genitive: 'математики' },
+  algebra: { name: 'Алгебра', genitive: 'алгебры' },
+  geometry: { name: 'Геометрия', genitive: 'геометрии' },
+  physics: { name: 'Физика', genitive: 'физики' },
+  chemistry: { name: 'Химия', genitive: 'химии' },
+  biology: { name: 'Биология', genitive: 'биологии' },
+  informatics: { name: 'Информатика', genitive: 'информатики' },
+  geography: { name: 'География', genitive: 'географии' },
+  astronomy: { name: 'Астрономия', genitive: 'астрономии' },
+};
+
+export const subjectGenitive = (code: string) => SUBJECTS[code]?.genitive ?? 'предмета';
+
+/** Subjects whose tasks are calculations with a number answer (what the app can check). */
+export const isMathLike = (code: string) => ['math', 'algebra', 'geometry'].includes(code);
+
+/** The seed textbooks (all from https://e-padruchnik.adu.by/, Russian-language editions); more are added in the admin page. */
 export interface BookConfig {
   id: string;
   file: string;
   grade: number;
-  subject: 'math' | 'algebra' | 'geometry';
+  /** Subject code: math, algebra, geometry, physics, chemistry, biology… (see SUBJECTS). */
+  subject: string;
   title: string;
   authors: string;
   year: number;

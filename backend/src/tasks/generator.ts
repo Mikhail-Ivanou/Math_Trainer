@@ -3,6 +3,7 @@
  * server (port of app/lib/tasks/task_generator.dart and
  * app/lib/topics/topic_matcher.dart — keep the prompts in sync).
  */
+import { isMathLike, subjectGenitive } from '../book/books.js';
 import { chatJson } from '../llm.js';
 import { parseTask, verifyTask, type Difficulty, type MathTask, type TaskType } from './verifier.js';
 
@@ -17,7 +18,8 @@ export interface GenerationRequest {
 
 export function counts(subject = 'math', level: Difficulty = 'medium'): Partial<Record<TaskType, number>> {
   const expert = level === 'expert';
-  if (subject === 'geometry') return { word: expert ? 6 : 8 };
+  // Outside maths only calculation problems: their number answer is what can be checked.
+  if (subject === 'geometry' || !isMathLike(subject)) return { word: expert ? 6 : 8 };
   if (subject === 'algebra') return expert ? { expression: 1, equation: 2, simplify: 2, word: 1 } : { expression: 2, equation: 2, simplify: 3, word: 1 };
   return expert ? { expression: 2, equation: 2, word: 2 } : { expression: 3, equation: 2, word: 3 };
 }
@@ -43,7 +45,11 @@ const TYPE_HINT: Record<TaskType, string> = {
   word: 'текстовая задача с числовым ответом',
 };
 
-const subjectName = (s?: string) => (s === 'algebra' ? 'алгебры' : s === 'geometry' ? 'геометрии' : 'математики');
+const subjectName = (s?: string) => subjectGenitive(s ?? 'math');
+
+/** The word-task hint: calculation problems with units outside maths. */
+const wordHint = (subject = 'math') =>
+  isMathLike(subject) ? TYPE_HINT.word : 'расчётная задача по теме с числовым ответом; в unit — единица ответа (м/с, Н, г, моль…); в solution_expr — вычисление ответа из чисел условия';
 
 export function systemPrompt(r: GenerationRequest): string {
   return `Ты — методист и учитель ${subjectName(r.subject)} ${r.grade} класса (Беларусь). Ты составляешь тренировочные задания для ученика на одно конкретное правило, которое тебе дают.
@@ -61,7 +67,7 @@ export function userPrompt(r: GenerationRequest): string {
   const level = r.level ?? 'medium';
   const c = counts(r.subject, level);
   const total = Object.values(c).reduce((a, b) => a + (b ?? 0), 0);
-  const lines = Object.entries(c).map(([type, n]) => `- ${n} заданий type "${type}" — ${TYPE_HINT[type as TaskType]}`);
+  const lines = Object.entries(c).map(([type, n]) => `- ${n} заданий type "${type}" — ${type === 'word' ? wordHint(r.subject) : TYPE_HINT[type as TaskType]}`);
   const context = r.context
     ? `
 Параграф учебника, из которого это правило (только чтобы понимать, что ученик уже знает):

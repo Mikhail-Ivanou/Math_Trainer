@@ -31,8 +31,12 @@ test('admin lists books with sections and rules', async () => {
 });
 
 test('bad requests get a message', async () => {
-  const r = await fetch(`${base}/api/admin/books?id=Bad%20Id&grade=5`, { method: 'POST' });
+  const r = await fetch(`${base}/api/admin/books`, { method: 'POST' });
   assert.equal(r.status, 400);
-  assert.match((await r.json()).error, /id/);
+  assert.match((await r.json()).error, /PDF или id/);
+  const notPdf = await fetch(`${base}/api/admin/books`, { method: 'POST', headers: { 'content-type': 'application/pdf' }, body: 'hello' });
+  assert.match((await notPdf.json()).error, /не PDF/);
+  const dup = await fetch(`${base}/api/admin/books?portalId=1149`, { method: 'POST' });
+  assert.equal(dup.status, 409); // math5-1 is already in the library
   assert.equal((await fetch(`${base}/api/admin/books/nope/sections`)).status, 404);
 });
