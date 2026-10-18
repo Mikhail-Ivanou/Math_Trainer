@@ -1,6 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import 'auth/auth_service.dart';
+import 'auth/password_dialog.dart';
 import 'data/models.dart';
 import 'data/repository.dart';
 import 'tasks/task_generator.dart';
@@ -16,14 +18,14 @@ class HomeScreen extends StatelessWidget {
     required this.repo,
     required this.generator,
     required this.matcher,
-    required this.onSignOut,
+    required this.auth,
   });
 
   final User user;
   final Repository repo;
   final TaskGenerator? generator;
   final TopicMatcher? matcher;
-  final Future<void> Function() onSignOut;
+  final FirebaseAuthService auth;
 
   void _open(BuildContext context, Topic t) => Navigator.of(context).push(MaterialPageRoute<void>(
         builder: (_) => TopicScreen(topic: t, user: user, repo: repo, generator: generator),
@@ -42,7 +44,21 @@ class HomeScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Math Trainer'),
-        actions: [IconButton(tooltip: 'Выйти', icon: const Icon(Icons.logout), onPressed: onSignOut)],
+        actions: [
+          PopupMenuButton<String>(
+            tooltip: 'Аккаунт',
+            icon: const Icon(Icons.account_circle_outlined),
+            onSelected: (v) => v == 'password' ? showPasswordDialog(context, auth) : auth.signOut(),
+            itemBuilder: (context) => [
+              PopupMenuItem(enabled: false, child: Text(user.email ?? user.displayName ?? '')),
+              PopupMenuItem(
+                value: 'password',
+                child: Text(auth.hasPassword ? 'Сменить пароль' : 'Задать пароль для входа'),
+              ),
+              const PopupMenuItem(value: 'signout', child: Text('Выйти')),
+            ],
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _add(context),

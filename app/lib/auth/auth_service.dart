@@ -59,6 +59,23 @@ class FirebaseAuthService implements AuthService {
     return true;
   }
 
+  /// Whether the signed-in account can also sign in with email and password.
+  bool get hasPassword => _auth.currentUser?.providerData.any((p) => p.providerId == 'password') ?? false;
+
+  /// Adds a password to the signed-in account (or changes it).
+  ///
+  /// Firebase keeps one account per email: signing in with Google drops an
+  /// unverified email/password sign-in for that gmail. Linking the password
+  /// again, after Google has verified the email, keeps both ways working.
+  Future<void> setPassword(String password) async {
+    final user = _auth.currentUser ?? (throw AuthFailure('Сначала войдите'));
+    final email = user.email ?? (throw AuthFailure('У аккаунта нет email'));
+    await _guard(() => hasPassword
+        ? user.updatePassword(password)
+        : user.linkWithCredential(EmailAuthProvider.credential(email: email, password: password)));
+    await user.reload();
+  }
+
   Future<void> signOut() async {
     await GoogleSignIn.instance.signOut();
     await _auth.signOut();
@@ -75,7 +92,11 @@ class FirebaseAuthService implements AuthService {
   static String messageFor(String code) => switch (code) {
         'invalid-email' => 'Неверный формат email',
         'user-disabled' => 'Аккаунт заблокирован',
-        'user-not-found' || 'wrong-password' || 'invalid-credential' => 'Неверный email или пароль',
+        'user-not-found' || 'wrong-password' || 'invalid-credential' =>
+          'Неверный email или пароль. Если вы входили через Google, войдите через Google '
+              'и задайте пароль в меню аккаунта — или нажмите «Забыли пароль?»',
+        'requires-recent-login' => 'Для смены пароля выйдите и войдите заново',
+        'credential-already-in-use' || 'provider-already-linked' => 'Этот способ входа уже привязан к аккаунту',
         'email-already-in-use' => 'Аккаунт с таким email уже есть — войдите',
         'weak-password' => 'Слишком простой пароль: нужно не меньше 6 символов',
         'too-many-requests' => 'Слишком много попыток, попробуйте позже',

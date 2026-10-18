@@ -28,7 +28,7 @@ class AuthGate extends StatelessWidget {
         final user = snapshot.data;
         return user == null
             ? SignInScreen(auth: auth)
-            : HomeScreen(user: user, repo: repo, generator: generator, matcher: matcher, onSignOut: auth.signOut);
+            : HomeScreen(user: user, repo: repo, generator: generator, matcher: matcher, auth: auth);
       },
     );
   }

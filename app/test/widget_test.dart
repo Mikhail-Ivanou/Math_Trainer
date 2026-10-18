@@ -66,7 +66,7 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'Войти'));
     await tester.pump();
     expect(auth.calls, hasLength(1));
-    expect(find.text('Неверный email или пароль'), findsOneWidget);
+    expect(find.textContaining('Неверный email или пароль'), findsOneWidget);
   });
 
   testWidgets('Google button calls Google sign-in', (tester) async {
