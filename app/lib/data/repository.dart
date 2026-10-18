@@ -9,7 +9,11 @@ class Repository {
 
   final FirebaseFirestore _db;
 
-  static const grades = [5, 6, 7];
+  /// Grades that have a published catalog (books are added in the admin page).
+  Future<List<int>> grades() async {
+    final s = await _db.collection('catalog').get();
+    return [for (final d in s.docs) ?int.tryParse(d.id.replaceFirst('grade-', ''))]..sort();
+  }
 
   CollectionReference<Map<String, dynamic>> _tasks(String topicId) => _db.collection('topics/$topicId/tasks');
   CollectionReference<Map<String, dynamic>> _progress(String uid) => _db.collection('users/$uid/progress');

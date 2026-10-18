@@ -25,6 +25,7 @@ class AddTopicScreen extends StatefulWidget {
 class _AddTopicScreenState extends State<AddTopicScreen> {
   final _query = TextEditingController();
   int _grade = 5;
+  List<int> _grades = const [5, 6, 7];
   List<CatalogRule> _catalog = const [];
   Map<String, Topic> _existing = const {};
   List<TopicMatch>? _matches;
@@ -36,6 +37,9 @@ class _AddTopicScreenState extends State<AddTopicScreen> {
   void initState() {
     super.initState();
     widget.repo.lastGrade(widget.user.uid).then((g) => _load(g ?? 5), onError: (_) => _load(5));
+    widget.repo.grades().then((g) {
+      if (mounted && g.isNotEmpty) setState(() => _grades = g);
+    }, onError: (_) {});
   }
 
   @override
@@ -140,7 +144,7 @@ class _AddTopicScreenState extends State<AddTopicScreen> {
           Text('Класс', style: theme.textTheme.labelLarge),
           const SizedBox(height: 8),
           SegmentedButton<int>(
-            segments: [for (final g in Repository.grades) ButtonSegment(value: g, label: Text('$g'))],
+            segments: [for (final g in _grades) ButtonSegment(value: g, label: Text('$g'))],
             selected: {_grade},
             onSelectionChanged: (s) => _load(s.first),
           ),

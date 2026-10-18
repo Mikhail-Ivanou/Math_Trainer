@@ -6,6 +6,7 @@ import 'data/repository.dart';
 import 'llm/aiai_client.dart';
 import 'tasks/task.dart';
 import 'tasks/task_generator.dart';
+import 'tasks/topic_pdf.dart';
 
 /// Tasks of one topic: answers, "solved" marks and generating new ones.
 class TopicScreen extends StatefulWidget {
@@ -28,6 +29,31 @@ class _TopicScreenState extends State<TopicScreen> {
   bool _generating = false;
   Difficulty _level = Difficulty.medium;
   bool _hideSolved = false;
+  // The latest snapshot of the lists below, for «PDF».
+  List<StoredTask> _lastTasks = const [];
+  Set<String> _lastSolved = const {};
+  bool _sharing = false;
+
+  Future<void> _sharePdf(BuildContext buttonContext) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final unsolved = _lastTasks.where((s) => !_lastSolved.contains(s.id)).toList();
+    if (unsolved.isEmpty) {
+      messenger.showSnackBar(const SnackBar(content: Text('Нерешённых заданий нет')));
+      return;
+    }
+    final box = buttonContext.findRenderObject() as RenderBox?;
+    final origin = box == null ? null : box.localToGlobal(Offset.zero) & box.size;
+    setState(() => _sharing = true);
+    try {
+      final bytes = await buildTopicPdf(widget.topic, unsolved,
+          answerText: (t) => '${formatAnswer(t.answer)}${t.unit == null ? '' : ' ${t.unit}'}');
+      await shareTopicPdf(widget.topic, bytes, origin: origin);
+    } on Exception catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('Не удалось подготовить PDF: $e')));
+    } finally {
+      if (mounted) setState(() => _sharing = false);
+    }
+  }
 
   @override
   void initState() {
@@ -101,7 +127,18 @@ class _TopicScreenState extends State<TopicScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(t.title, maxLines: 2, overflow: TextOverflow.ellipsis),
-        actions: [IconButton(tooltip: 'Правило', icon: const Icon(Icons.menu_book_outlined), onPressed: _showTheory)],
+        actions: [
+          Builder(
+            builder: (buttonContext) => IconButton(
+              tooltip: 'PDF с нерешёнными заданиями',
+              icon: _sharing
+                  ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.picture_as_pdf_outlined),
+              onPressed: _sharing ? null : () => _sharePdf(buttonContext),
+            ),
+          ),
+          IconButton(tooltip: 'Правило', icon: const Icon(Icons.menu_book_outlined), onPressed: _showTheory),
+        ],
       ),
       floatingActionButton: widget.generator == null
           ? null
@@ -134,6 +171,8 @@ class _TopicScreenState extends State<TopicScreen> {
                 ),
               );
             }
+            _lastTasks = tasks;
+            _lastSolved = solved;
             final done = tasks.where((s) => solved.contains(s.id)).length;
             final shown = _hideSolved ? tasks.where((s) => !solved.contains(s.id)).toList() : tasks;
             final header = Padding(
@@ -315,7 +354,7 @@ class _TaskCardState extends State<TaskCard> {
   Widget build(BuildContext context) {
     final task = widget.stored.task;
     final theme = Theme.of(context);
-    final answer = '${_formatAnswer(task.answer)}${task.unit == null ? '' : ' ${task.unit}'}';
+    final answer = '${formatAnswer(task.answer)}${task.unit == null ? '' : ' ${task.unit}'}';
     return Card(
       color: widget.solved ? theme.colorScheme.secondaryContainer.withValues(alpha: 0.5) : null,
       child: Padding(
@@ -356,7 +395,7 @@ String formatExpression(String e) {
 }
 
 /// How the textbook writes answers: "12450" -> "12 450", "2.5" -> "2,5", "-7/3" -> "−7/3".
-String _formatAnswer(String answer) {
+String formatAnswer(String answer) {
   final m = RegExp(r'^(-?)(\d+)([.,]\d+)?(/\d+)?$').firstMatch(answer.trim());
   if (m == null) return formatExpression(answer);
   final digits = m[2]!;

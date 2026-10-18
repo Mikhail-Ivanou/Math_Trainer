@@ -39,6 +39,9 @@ dependencies:
   google_sign_in: ^7.2.0
   http: ^1.6.0
   cloud_firestore: ^6.0.0
+  pdf: ^3.13.1
+  share_plus: ^13.3.1
+  path_provider: ^2.1.6
 
 dev_dependencies:
   flutter_test:
@@ -61,6 +64,11 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  # DejaVu Sans for PDFs: Cyrillic, superscripts and · − ×
+  assets:
+    - assets/fonts/DejaVuSans.ttf
+    - assets/fonts/DejaVuSans-Bold.ttf
 
   # To add assets to your application, add an assets section, like this:
   # assets:
