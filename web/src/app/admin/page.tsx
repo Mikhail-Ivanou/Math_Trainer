@@ -99,37 +99,29 @@ export default function AdminPage() {
 
       <section>
         <h2 className="text-lg font-medium">Учебники</h2>
-        <table className="mt-2 w-full overflow-hidden rounded-xl bg-white text-sm ring-1 ring-gray-200">
-          <thead className="bg-gray-50 text-left text-gray-600">
-            <tr><th className="p-2">id</th><th className="p-2">Учебник</th><th className="p-2">Класс</th><th className="p-2">§</th><th className="p-2">Тем</th><th className="p-2" /></tr>
-          </thead>
-          <tbody>
-            {books?.map((b) => (
-              <tr key={b.id} className="border-t border-gray-100 align-top">
-                <td className="p-2 font-mono">{b.id}</td>
-                <td className="p-2">
-                  {b.title}
-                  <div className="text-xs text-gray-500">
-                    {subjectNames[b.subject] ?? b.subject} · {b.authors} · {b.year}{b.portalId ? ` · adu.by ${b.portalId}` : ''}{b.hasPdf ? '' : ' · нет PDF в data/'}
-                  </div>
-                </td>
-                <td className="p-2">{b.grade}</td>
-                <td className="p-2">{b.sectionCount ?? 0}</td>
-                <td className="p-2">{b.topicCount}</td>
-                <td className="p-2 whitespace-nowrap text-right">
-                  <button className="link mr-3" onClick={() => setOpen(open === b.id ? null : b.id)}>{open === b.id ? 'Закрыть' : 'Параграфы'}</button>
-                  <button className="link mr-3" disabled={busy || running || !b.hasPdf} title="Повторить обработку; LLM-шаги берутся из кэша"
-                    onClick={() => act(() => api(`/api/admin/books/${b.id}/process`, { method: 'POST' }))}>Обработать</button>
-                  <button className="link mr-3" disabled={busy || running || !b.hasPdf} title="Очистить кэш LLM и обработать с нуля (платно)"
-                    onClick={() => confirm('Обработать с нуля? Оглавление, листы и правила будут заново составлены LLM, ручные правки этой книги пропадут.') &&
-                      act(() => api(`/api/admin/books/${b.id}/process?fresh=1`, { method: 'POST' }))}>С нуля</button>
-                  <button className="btn-danger" disabled={busy} onClick={() => remove(b)}>Удалить</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {open && books?.find((b) => b.id === open) && <BookEditor book={books.find((b) => b.id === open)!} onChanged={load} />}
+        <ul className="mt-2 flex flex-col gap-2">
+          {books?.map((b) => (
+            <li key={b.id} className="card">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-4">
+                <div className="font-medium">{b.title} <span className="font-mono text-xs text-gray-500">{b.id}</span></div>
+                <div className="text-sm text-gray-600">{b.grade} класс · {b.sectionCount ?? 0} § · тем у учеников: {b.topicCount}</div>
+              </div>
+              <div className="text-xs text-gray-500">
+                {subjectNames[b.subject] ?? b.subject} · {b.authors} · {b.year}{b.portalId ? ` · adu.by ${b.portalId}` : ''}{b.hasPdf ? '' : ' · нет PDF в data/'}
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+                <button className="link" onClick={() => setOpen(open === b.id ? null : b.id)}>{open === b.id ? 'Закрыть параграфы' : 'Параграфы и правила'}</button>
+                <button className="link" disabled={busy || running || !b.hasPdf} title="Повторить обработку; LLM-шаги берутся из кэша"
+                  onClick={() => act(() => api(`/api/admin/books/${b.id}/process`, { method: 'POST' }))}>Обработать</button>
+                <button className="link" disabled={busy || running || !b.hasPdf} title="Очистить кэш LLM и обработать с нуля (платно)"
+                  onClick={() => confirm('Обработать с нуля? Оглавление, листы и правила будут заново составлены LLM, ручные правки этой книги пропадут.') &&
+                    act(() => api(`/api/admin/books/${b.id}/process?fresh=1`, { method: 'POST' }))}>С нуля</button>
+                <button className="btn-danger" disabled={busy} onClick={() => remove(b)}>Удалить</button>
+              </div>
+              {open === b.id && <BookEditor book={b} onChanged={load} />}
+            </li>
+          ))}
+        </ul>
         <AddBook disabled={busy || running} onAdded={load} />
       </section>
 
@@ -156,7 +148,7 @@ export default function AdminPage() {
           </button>
         </div>
         {topics && (
-          <table className="mt-2 w-full rounded-xl bg-white text-sm ring-1 ring-gray-200">
+          <div className="mt-2 overflow-x-auto"><table className="w-full rounded-xl bg-white text-sm ring-1 ring-gray-200">
             <thead className="bg-gray-50 text-left text-gray-600">
               <tr><th className="p-2">Правило</th><th className="p-2">Класс</th><th className="p-2">Учеников</th><th className="p-2">Заданий</th><th className="p-2">Что писали</th></tr>
             </thead>
@@ -171,7 +163,7 @@ export default function AdminPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
       </section>
     </main>

@@ -21,7 +21,7 @@ const s = StyleSheet.create({
   answer: { marginTop: 4 },
 });
 
-function TopicPdf({ topic, tasks, date }: { topic: Topic; tasks: StoredTask[]; date: string }) {
+export function TopicPdf({ topic, tasks, date }: { topic: Topic; tasks: StoredTask[]; date: string }) {
   const source = `${topic.bookTitle} · § ${topic.sectionNumber}. ${topic.sectionTitle}`;
   return (
     <Document title={`${topic.title} — задания`} author="Math Trainer">
