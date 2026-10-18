@@ -12,6 +12,7 @@ class GenerationRequest {
     required this.grade,
     this.context = '',
     this.subject = 'math',
+    this.level = Difficulty.medium,
     Map<TaskType, int>? counts,
   }) : _counts = counts; // ignore: prefer_initializing_formals — the public name is `counts`
 
@@ -26,17 +27,48 @@ class GenerationRequest {
 
   /// "math", "algebra" or "geometry".
   final String subject;
+
+  /// Every task of the batch is at this level.
+  final Difficulty level;
   final Map<TaskType, int>? _counts;
 
   /// Geometry has few pure calculations; algebra adds "simplify" tasks.
+  /// Harder levels get fewer, longer tasks.
   Map<TaskType, int> get counts =>
       _counts ??
-      switch (subject) {
-        'geometry' => {TaskType.word: 10},
-        'algebra' => {TaskType.expression: 3, TaskType.equation: 3, TaskType.simplify: 4, TaskType.word: 2},
-        _ => {TaskType.expression: 5, TaskType.equation: 4, TaskType.word: 3},
+      switch ((subject, level)) {
+        ('geometry', Difficulty.expert) => {TaskType.word: 6},
+        ('geometry', _) => {TaskType.word: 8},
+        ('algebra', Difficulty.expert) => {TaskType.expression: 1, TaskType.equation: 2, TaskType.simplify: 2, TaskType.word: 1},
+        ('algebra', _) => {TaskType.expression: 2, TaskType.equation: 2, TaskType.simplify: 3, TaskType.word: 1},
+        (_, Difficulty.expert) => {TaskType.expression: 2, TaskType.equation: 2, TaskType.word: 2},
+        _ => {TaskType.expression: 3, TaskType.equation: 2, TaskType.word: 3},
       };
 }
+
+/// What each level means, for the model and for the level picker.
+const levelNames = {
+  Difficulty.easy: 'Лёгкий',
+  Difficulty.medium: 'Средний',
+  Difficulty.hard: 'Сложный',
+  Difficulty.expert: 'Максимальный',
+};
+
+const levelHints = {
+  Difficulty.medium: 'Как задания из учебника: правило в 2–3 шага, числа побольше',
+  Difficulty.hard: 'В 3–5 шагов, вместе с другими правилами, с подвохом',
+  Difficulty.expert: 'Повышенная трудность, почти олимпиада: нужна догадка',
+};
+
+const _levelForModel = {
+  Difficulty.easy: 'лёгкий: правило в один шаг, небольшие числа',
+  Difficulty.medium: 'средний: как основные задания учебника — правило применяется в 2–3 шага, числа побольше, есть скобки и порядок действий',
+  Difficulty.hard: 'сложный: 3–5 шагов, правило нужно сочетать с ранее изученным, числа неудобные, формулировка непрямая, есть ловушки (типичные ошибки учеников); текстовые задачи — в несколько действий',
+  Difficulty.expert: 'максимальный: задания повышенной трудности и олимпиадного типа для сильных учеников этого класса — '
+      'длинные цепочки, нестандартная формулировка, нужно догадаться, как применить правило '
+      '(вынести общий множитель, сгруппировать, заметить закономерность, рассуждать от обратного); '
+      'но всё решается знаниями ученика этого класса, без формул из старших классов, и ответ однозначный',
+};
 
 class RejectedTask {
   const RejectedTask(this.raw, this.reason);
@@ -65,7 +97,8 @@ class TaskGenerator {
     final rejected = <RejectedTask>[];
     for (final raw in parseTasks(reply.content)) {
       try {
-        final task = MathTask.fromJson(raw as Map<String, dynamic>);
+        // The batch is one level, whatever the model wrote in "difficulty".
+        final task = MathTask.fromJson({...raw as Map<String, dynamic>, 'difficulty': req.level.name});
         final verdict = verifyTask(task);
         verdict.ok ? tasks.add(task) : rejected.add(RejectedTask(raw, verdict.reason!));
       } on Object catch (e) {
@@ -94,7 +127,7 @@ class TaskGenerator {
 - формулировки на русском языке, понятные ученику ${r.grade} класса;
 - текст задания (question) должен быть полным: ученик видит только его, поэтому выражение или уравнение пиши прямо в question;
 - в question числа с пробелом между классами (12 450), десятичная запятая (2,5), знаки ·, :, −;
-- задания разной сложности (easy, medium, hard) и разные по сюжету, без повторов;
+- все задания одного уровня — того, что указан в запросе; разные по сюжету и приёму, без повторов;
 - ответ к каждому заданию обязателен и должен быть верным — перепроверь вычисления.
 Верни только JSON без пояснений и без markdown.''';
 
@@ -115,7 +148,8 @@ ${r.context.isEmpty ? '' : '''
 ${r.context}
 >>>
 '''}
-Составь $total новых заданий, каждое из которых тренирует именно это правило:
+Составь $total новых заданий, каждое из которых тренирует именно это правило.
+Уровень всех заданий — ${_levelForModel[r.level]}. В поле difficulty у всех пиши "${r.level.name}".
 ${lines.join('\n')}
 
 Поля для проверки ответа (их видит только программа):
@@ -124,7 +158,7 @@ ${lines.join('\n')}
 
 Формат ответа:
 {"tasks": [
-  {"type": "expression", "difficulty": "easy|medium|hard", "question": "Вычислите: 1 234 + 5 678", "expr": "1234+5678", "answer": "6912"},
+  {"type": "expression", "difficulty": "${r.level.name}", "question": "Вычислите: 1 234 + 5 678", "expr": "1234+5678", "answer": "6912"},
   {"type": "equation", "difficulty": "...", "question": "Решите уравнение: 3x − 4 = 11", "equation": "3x-4=11", "variable": "x", "answer": "5"},
   {"type": "simplify", "difficulty": "...", "question": "Упростите выражение: 2a + 3a − b", "expr": "2a+3a-b", "answer": "5a-b"},
   {"type": "word", "difficulty": "...", "question": "...", "solution_expr": "выражение, дающее ответ", "answer": "42", "unit": "км"}

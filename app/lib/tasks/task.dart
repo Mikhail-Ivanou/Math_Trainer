@@ -1,6 +1,6 @@
 enum TaskType { expression, equation, word, simplify }
 
-enum Difficulty { easy, medium, hard }
+enum Difficulty { easy, medium, hard, expert }
 
 /// One exercise. Besides the text shown to the student it carries a
 /// machine-checkable form (expr / equation / solutionExpr) so the answer can be

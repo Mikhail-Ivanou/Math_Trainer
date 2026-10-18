@@ -52,7 +52,7 @@ service cloud.firestore {
           && data.keys().hasOnly(['type', 'difficulty', 'question', 'answer', 'source', 'createdBy', 'createdAt', 'model',
                                   'expr', 'equation', 'variable', 'solution_expr', 'unit'])
           && data.type in ['expression', 'equation', 'word', 'simplify']
-          && data.difficulty in ['easy', 'medium', 'hard']
+          && data.difficulty in ['easy', 'medium', 'hard', 'expert']
           && data.question is string && data.question.size() >= 3 && data.question.size() <= 1000
           && data.answer is string && data.answer.size() >= 1 && data.answer.size() <= 100
           && data.source == 'app'

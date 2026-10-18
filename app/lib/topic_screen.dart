@@ -26,10 +26,20 @@ class _TopicScreenState extends State<TopicScreen> {
   late final Stream<List<StoredTask>> _tasks = widget.repo.tasks(widget.topic.id);
   late final Stream<Set<String>> _solved = widget.repo.solvedTaskIds(widget.user.uid, widget.topic.id);
   bool _generating = false;
+  Difficulty _level = Difficulty.medium;
   // The paragraph's whole rule sheet: background for generation and «Весь параграф».
   late final Future<String> _sectionSheet = widget.repo.sectionSheet(widget.topic).catchError((_) => '');
 
+  /// Asks for the level, then generates a batch of that level.
   Future<void> _generate() async {
+    final level = await showModalBottomSheet<Difficulty>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true, // as tall as its content, scrolls on small screens
+      builder: (context) => LevelPicker(initial: _level),
+    );
+    if (level == null || !mounted) return;
+    setState(() => _level = level);
     final generator = widget.generator!;
     final messenger = ScaffoldMessenger.of(context);
     setState(() => _generating = true);
@@ -41,6 +51,7 @@ class _TopicScreenState extends State<TopicScreen> {
         context: await _sectionSheet,
         grade: t.grade,
         subject: t.subject,
+        level: level,
       ));
       if (result.tasks.isEmpty) {
         messenger.showSnackBar(const SnackBar(content: Text('Модель не дала ни одного верного задания, попробуйте ещё раз')));
@@ -131,6 +142,59 @@ class _TopicScreenState extends State<TopicScreen> {
   }
 }
 
+/// Level choice for a new batch: medium, hard or the hardest.
+class LevelPicker extends StatefulWidget {
+  const LevelPicker({super.key, required this.initial});
+
+  final Difficulty initial;
+
+  @override
+  State<LevelPicker> createState() => _LevelPickerState();
+}
+
+class _LevelPickerState extends State<LevelPicker> {
+  late Difficulty _level = widget.initial;
+
+  static const _levels = [Difficulty.medium, Difficulty.hard, Difficulty.expert];
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Уровень заданий', style: theme.textTheme.titleLarge),
+            const SizedBox(height: 8),
+            RadioGroup<Difficulty>(
+              groupValue: _level,
+              onChanged: (v) => setState(() => _level = v ?? _level),
+              child: Column(children: [
+                for (final l in _levels)
+                  RadioListTile<Difficulty>(
+                    contentPadding: EdgeInsets.zero,
+                    value: l,
+                    title: Text(levelNames[l]!),
+                    subtitle: Text(levelHints[l]!),
+                  ),
+              ]),
+            ),
+            const SizedBox(height: 8),
+            FilledButton.icon(
+              onPressed: () => Navigator.pop(context, _level),
+              icon: const Icon(Icons.auto_awesome),
+              label: const Text('Составить задания'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// The rule, its source, and on request the whole paragraph's rule sheet.
 class _RuleSheet extends StatefulWidget {
   const _RuleSheet({required this.topic, required this.sectionSheet, required this.scroll});
@@ -200,7 +264,12 @@ class TaskCard extends StatefulWidget {
 class _TaskCardState extends State<TaskCard> {
   bool _showAnswer = false;
 
-  static const _difficulty = {Difficulty.easy: 'легко', Difficulty.medium: 'средне', Difficulty.hard: 'сложно'};
+  static const _difficulty = {
+    Difficulty.easy: 'легко',
+    Difficulty.medium: 'средне',
+    Difficulty.hard: 'сложно',
+    Difficulty.expert: 'максимум',
+  };
   static const _type = {
     TaskType.expression: 'вычисли',
     TaskType.equation: 'уравнение',

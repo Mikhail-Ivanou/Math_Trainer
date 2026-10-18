@@ -141,6 +141,7 @@ describe('shared tasks', () => {
   test('a signed-in user adds well-formed tasks under their uid', async () => {
     await assertSucceeds(addDoc(tasks(kid()), appTask()));
     await assertSucceeds(addDoc(tasks(kid()), appTask({ answer: '-3/4' })));
+    await assertSucceeds(addDoc(tasks(kid()), appTask({ difficulty: 'expert' })));
     await assertSucceeds(addDoc(tasks(kid()), appTask({ type: 'simplify', expr: '2a+3a', answer: '5a' })));
     const { expr, ...rest } = appTask();
     await assertSucceeds(addDoc(tasks(kid()), { ...rest, type: 'word', solution_expr: '(24+4):2', answer: '14', unit: 'конфет' }));
@@ -157,6 +158,7 @@ describe('shared tasks', () => {
     await assertFails(addDoc(tasks(kid()), appTask({ answer: 5775 })));
     await assertFails(addDoc(tasks(kid()), appTask({ answer: '' })));
     await assertFails(addDoc(tasks(kid()), appTask({ type: 'essay' })));
+    await assertFails(addDoc(tasks(kid()), appTask({ difficulty: 'olympic' })));
     await assertFails(addDoc(tasks(kid()), appTask({ question: 'x'.repeat(1001) })));
     await assertFails(addDoc(tasks(kid()), appTask({ solved: true })));
   });
